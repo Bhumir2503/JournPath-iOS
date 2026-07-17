@@ -1,0 +1,83 @@
+# ====================================================================
+# JOURNPATH - NATIVE IOS APP GITIGNORE
+# ====================================================================
+
+# --- Local Native Build Diagnostics ---
+build.log
+buildServer.json
+
+# --- Core Xcode Tracking & Target Blueprint White-Listing ---
+# Track the baseline project structure definitions
+!**/JournPath.xcodeproj/project.pbxproj
+!**/JournPath.xcodeproj/project.xcworkspace
+
+# Absolute Block against personal workspace arrangements, tab histories, and window states
+**/xcuserdata/
+**/.xcuserdatad/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# --- App Architecture Alignment & Code Style Formatting ---
+!**/.swift-format
+
+# --- Device Distribution and App Symbol Packaging ---
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.hmap
+
+# --- Swift Package Manager (SPM) Dependency Targets ---
+.build/
+
+# --- Local Workspace Playgrounds ---
+timeline.xctimeline
+playground.xcworkspace
+
+# --- External Dependency Handlers (Carthage / Accio) ---
+Carthage/Build/
+Dependencies/
+.accio/
+
+# --- Pipeline Deploy Automation (Fastlane) ---
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+
+# ====================================================================
+# JOURNPATH - MASTER ROOT GLOBAL GITIGNORE
+# ====================================================================
+
+# --- OS System Clutter ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# --- IDEs & Code Editor Workspace Settings ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- AI Agents & Artifact Tunnels ---
+.gemini/
+.agent/
+.copilot/
+
+# --- Universal Secret Protection Guardrails ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*service-account*.json
+*serviceaccount*.json%
