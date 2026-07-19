@@ -8,8 +8,7 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:usemyjourney.com</string>
-		<string>applinks:journpath.com</string>
+		<string>applinks:invite.journpath.com?mode=developer</string>
 	</array>
 	<key>com.apple.developer.devicecheck.appattest-environment</key>
 	<string>production</string>

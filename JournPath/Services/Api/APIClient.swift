@@ -36,7 +36,7 @@ final class APIClient {
             )
             let (data, response) = try await session.data(for: request)
 
-            // This will throw APIError.serverError if the backend sends an error
+            // This will throw the appropriate APIError case if the backend sends an error
             return try parse(data: data, response: response)
 
         } catch let error as APIError {
@@ -49,7 +49,7 @@ final class APIClient {
 
         } catch {
             // 3. Fallback: For JSON serialization failures or token fetching errors inside makeRequest.
-            throw .serverError(status: 0, message: "An unexpected error occurred: \(error.localizedDescription)")
+            throw .unknownServerError(status: 0, message: "An unexpected error occurred: \(error.localizedDescription)")
         }
     }
 
@@ -96,8 +96,9 @@ final class APIClient {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
 
         guard (200..<300).contains(http.statusCode) else {
-            let message = json?["message"] as? String ?? json?["error"] as? String
-            throw APIError.serverError(status: http.statusCode, message: message)
+            let message = json?["message"] as? String
+            let errorCode = json?["error"] as? String
+            throw APIError(statusCode: http.statusCode, errorCode: errorCode, message: message)
         }
 
         guard let json else {
