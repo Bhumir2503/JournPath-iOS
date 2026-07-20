@@ -44,7 +44,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 }
 
 @main
-struct MyJourneyApp: App {
+struct JournPathApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     var body: some Scene {

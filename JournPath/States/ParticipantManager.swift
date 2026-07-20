@@ -35,7 +35,7 @@ final class ParticipantManager {
             .collection("trips")
             .document(tripId)
             .collection("participants")
-            .whereField("isKicked", isEqualTo: false)
+            .whereField("status", isEqualTo: "accepted")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
@@ -67,7 +67,7 @@ final class ParticipantManager {
                     .collection("trips")
                     .document(tripId)
                     .collection("participants")
-                    .whereField("isKicked", isEqualTo: true)
+                    .whereField("status", isEqualTo: "kicked")
                     .addSnapshotListener { [weak self] snapshot, error in
                         guard let self = self else { return }
                         if let error = error {

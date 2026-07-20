@@ -145,11 +145,15 @@ struct ParticipantManagementView: View {
     // MARK: - Share payload
 
     var shareURL: URL? {
-        var components = URLComponents(string: "https://usemyjourney.com/join")
+        // 1. Build the path string with the tripId interpolated
+        let path = "https://journpath.com/invite/trip/\(tripManager.tripId)"
+
+        // 2. Use URLComponents to safely add the token query parameter
+        var components = URLComponents(string: path)
         components?.queryItems = [
-            URLQueryItem(name: "tripId", value: tripManager.tripId),
-            URLQueryItem(name: "inviteToken", value: tripManager.inviteToken),
+            URLQueryItem(name: "token", value: tripManager.inviteToken)
         ]
+
         return components?.url
     }
 

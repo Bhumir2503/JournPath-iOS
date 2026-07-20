@@ -18,7 +18,6 @@ struct TripListView: View {
             .sheet(isPresented: $isShowingCreateTrip) { CreateTripView() }
             .background(Color(uiColor: .systemGroupedBackground))
             .onAppear {
-                print("photoURL: \(session.photoURL ?? "No photo URL")")
                 if let userId = session.uid, router.path.isEmpty {
                     manager.startListening(userId: userId)
                 }
