@@ -11,18 +11,8 @@ import Foundation
 final class TripService {
 
     private let db = Firestore.firestore()
-    private let apiBaseURL = URL(string: "https://api.journpath.com")!
-    
-    @discardableResult
+
     func create(name: String, startDate: Date, endDate: Date, imageURL: String, imageColor: String, imageBlurHash: String, imageAuthor: String) async throws -> String {
-        guard let user = Auth.auth().currentUser else {
-            throw TripServiceError.notAuthenticated
-        }
-
-        // Tokens required by the `gate` middleware (Auth + App Check)
-        let idToken = try await user.getIDToken()
-        let appCheckToken = try await AppCheck.appCheck().token(forcingRefresh: false)
-
         let formatter = ISO8601DateFormatter()
 
         let payload: [String: Any] = [
@@ -37,30 +27,10 @@ final class TripService {
             ]
         ]
 
-        var request = URLRequest(url: apiBaseURL.appendingPathComponent("createTrip"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(appCheckToken.token, forHTTPHeaderField: "X-Firebase-AppCheck")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw TripServiceError.invalidResponse
+        let result = try await APIClient.shared.post("/trip/create", body: payload)
+        guard let tripId = result["tripId"] as? String else {
+            throw APIError.invalidResponse
         }
-
-        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-
-        guard (200..<300).contains(http.statusCode) else {
-            let message = json?["message"] as? String ?? json?["error"] as? String
-            throw TripServiceError.serverError(status: http.statusCode, message: message)
-        }
-
-        guard let tripId = json?["tripId"] as? String else {
-            throw TripServiceError.invalidResponse
-        }
-
         return tripId
     }
 
@@ -108,57 +78,17 @@ final class TripService {
         ]
         try await db.collection("trips").document(tripId).updateData(updates)
     }
+
+    func leaveTrip(tripId: String) async throws {
+        let uid = try AuthUtils.requireUserId()
+        try await db.collection("users").document(uid).collection("trips").document(tripId).delete()
+    }
 }
 
 // MARK: - User Management
 extension TripService {
     func regenerateInviteToken(tripId: String) async throws {
         try await APIClient.shared.post("/trip/regenerateInviteToken", body: ["tripId": tripId])
-    }
-}
-
-// MARK: - Listeners
-extension TripService {
-    func listenToTripCollection(userId: String, completion: @escaping ([Trip]?, Error?) -> Void) -> () -> Void {
-        let listener = db.collection("trips")
-            .whereField("participants", arrayContains: userId)
-            .whereField("isDeleted", isEqualTo: false)
-            .order(by: "startDate", descending: false)
-            .addSnapshotListener { snapshot, error in
-
-                if let error = error {
-                    AppLogger.database.error("[TripService.swift] Error listening to trip collection: \(error.localizedDescription)")
-                    completion(nil, error)
-                    return
-                }
-
-                let trips = snapshot?.documents.compactMap { doc -> Trip? in
-                    do {
-                        return try doc.data(as: Trip.self)
-                    } catch {
-                        AppLogger.database.error("[TripService.swift] Failed to decode trip \(doc.documentID): \(error.localizedDescription)")
-                        return nil
-                    }
-                }
-                completion(trips, nil)
-            }
-
-        return { listener.remove() }
-    }
-
-    func listenToTripDocument(tripId: String, completion: @escaping (Trip?, Error?) -> Void) -> () -> Void {
-        let listener = db.collection("trips").document(tripId)
-            .addSnapshotListener { snapshot, error in
-                if let error = error {
-                    AppLogger.database.error("[TripService.swift] Error listening to trip document: \(error.localizedDescription)")
-                    completion(nil, error)
-                    return
-                }
-                let trip = try? snapshot?.data(as: Trip.self)
-                completion(trip, nil)
-            }
-
-        return { listener.remove() }
     }
 }
 

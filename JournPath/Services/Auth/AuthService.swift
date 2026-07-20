@@ -57,14 +57,8 @@ class AuthService {
     }
 
     // MARK: - Profile Management
-    func updateProfile(payload: [String: Any]) async throws(AuthError) {
-        do {
-            _ = try await Functions.functions()
-                .httpsCallable("updateUserProfile")
-                .call(payload)
-        } catch {
-            throw AuthError(firebaseError: error)
-        }
+    func updateProfile(payload: [String: Any]) async throws(APIError) {
+        try await APIClient.shared.post("/user/update", body: payload)
     }
 
     // MARK: - Account Linking

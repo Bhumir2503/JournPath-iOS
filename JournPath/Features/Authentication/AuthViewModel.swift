@@ -12,7 +12,6 @@ class AuthViewModel {
     var error: AuthError? = nil
 
     private let authService = AuthService()
-    private let userDBService = UserDatabaseService()
 
     func signUpErrorChecker(email: String, password: String, reenterPassword: String) throws(AuthError) {
         if password != reenterPassword {

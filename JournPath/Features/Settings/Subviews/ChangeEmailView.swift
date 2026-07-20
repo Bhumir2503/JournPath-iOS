@@ -28,6 +28,7 @@ struct ChangeEmailView: View {
     @State private var confirmEmail = ""
     @State private var errorMessage: String? = nil
     @State private var successMessage: String? = nil
+    @State private var error: AuthError?
 
     private enum Field: Hashable {
         case currentPassword, newEmail, confirmEmail
@@ -35,7 +36,6 @@ struct ChangeEmailView: View {
     @FocusState private var focusedField: Field?
 
     private let authService = AuthService()
-    private let userDB = UserDatabaseService()
     
     private var isValid: Bool {
         !currentPassword.isEmpty && newEmail.isValidEmail && newEmail == confirmEmail
@@ -104,11 +104,10 @@ struct ChangeEmailView: View {
                         successMessage = "Your email has been successfully updated."
                     } catch {
                         if let localizedError = error as? LocalizedError {
-                            errorMessage = localizedError.errorDescription ?? error.localizedDescription
+                            errorMessage = localizedError.recoverySuggestion ?? error.localizedDescription
                         } else {
-                            errorMessage = AuthError(firebaseError: error).errorDescription
+                            errorMessage = AuthError(firebaseError: error).recoverySuggestion ?? error.localizedDescription
                         }
-                        throw error
                     }
                 } closingAction: {
                     // Do nothing, let the user read the message and dismiss manually

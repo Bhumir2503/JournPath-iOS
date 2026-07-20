@@ -92,7 +92,7 @@ extension TripListView {
         @State private var showingDeleteAlert: Bool = false
         @State private var tripToDelete: TripInfo?
 
-        private let userDBService = UserDatabaseService()
+        private let tripService = TripService()
 
         var body: some View {
             if !trips.isEmpty {
@@ -197,7 +197,7 @@ extension TripListView.TripListSection {
         guard let id = trip.id else { return }
         Task {
             do {
-                try await userDBService.leaveTrip(tripId: id)
+                try await tripService.leaveTrip(tripId: id)
             } catch {
                 AppLogger.managers.error("Failed to leave trip: \(error.localizedDescription)")
             }

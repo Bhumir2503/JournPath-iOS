@@ -22,7 +22,6 @@ struct TripDashboardView: View {
     // MARK: - MVS Components
     @State private var tripManager: TripManager
     private let tripService = TripService()
-    private let userDBService = UserDatabaseService()
     @Environment(AppRouter.self) private var router
 
     // MARK: - Local UI State (Unified)
@@ -231,7 +230,7 @@ extension TripDashboardView {
 extension TripDashboardView {
     private func leaveTrip() {
         Task {
-            try? await userDBService.leaveTrip(tripId: tripId)
+            try? await tripService.leaveTrip(tripId: tripId)
             router.pop()
         }
     }
