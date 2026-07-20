@@ -9,15 +9,6 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
-// 1. Define a model that matches your Firestore "users" collection
-struct UserProfile: Codable, Equatable {
-    let uid: String
-    let displayName: String
-    let photoURL: String
-    let linkedProviders: [String]
-    let createdAt: Date
-}
-
 enum AuthState {
     case loading
     case loggedIn
@@ -28,12 +19,10 @@ enum AuthState {
 @Observable
 class SessionStore {
     var currentUser: FirebaseAuth.User?
-    var userProfile: User?  // The true source of truth for your UI
     var state: AuthState = .loading
     var isHandlingManualAuth: Bool = false
 
     private var authListenerHandle: AuthStateDidChangeListenerHandle?
-    private var firestoreListener: ListenerRegistration?
 
     init() {
         setupAuthListener()
@@ -50,28 +39,11 @@ class SessionStore {
     private func handleAuthStateChange(user: FirebaseAuth.User?) async {
         self.currentUser = user
 
-        // Remove old listener whenever the auth state changes
-        firestoreListener?.remove()
-
-        if let user = user {
-            // Listen to the Firestore document in real-time
-            firestoreListener = Firestore.firestore()
-                .collection("users")
-                .document(user.uid)
-                .addSnapshotListener { [weak self] snapshot, _ in
-                    guard let self = self else { return }
-
-                    if let data = try? snapshot?.data(as: User.self) {
-                        self.userProfile = data
-                    }
-
-                    // Only update state if we aren't in the middle of a manual auth flow
-                    if !self.isHandlingManualAuth {
-                        self.state = .loggedIn
-                    }
-                }
+        if user != nil {
+            if !self.isHandlingManualAuth {
+                self.state = .loggedIn
+            }
         } else {
-            self.userProfile = nil
             if !self.isHandlingManualAuth {
                 self.state = .loggedOut
             }
@@ -94,7 +66,7 @@ extension SessionStore {
     var uid: String? { currentUser?.uid }
 
     var displayName: String {
-        userProfile?.displayName ?? currentUser?.displayName ?? "Anonymous"
+        currentUser?.displayName ?? "Anonymous"
     }
 
     var email: String {
@@ -102,19 +74,19 @@ extension SessionStore {
     }
 
     var photoURL: String? {
-        userProfile?.photoURL ?? currentUser?.photoURL?.absoluteString
+        currentUser?.photoURL?.absoluteString
     }
 
     // Checking providers via Firestore Source of Truth
     var isGoogleLinked: Bool {
-        userProfile?.linkedProviders.contains("google.com") ?? false
+        currentUser?.providerData.contains(where: { $0.providerID == "google.com" }) ?? false
     }
 
     var isAppleLinked: Bool {
-        userProfile?.linkedProviders.contains("apple.com") ?? false
+        currentUser?.providerData.contains(where: { $0.providerID == "apple.com" }) ?? false
     }
 
     var isEmailPasswordLinked: Bool {
-        userProfile?.linkedProviders.contains("password") ?? false
+        currentUser?.providerData.contains(where: { $0.providerID == "password" }) ?? false
     }
 }

@@ -18,8 +18,7 @@ struct ContentView: View {
     @AppStorage("pendingInviteToken") var pendingInviteToken: String?
 
     @State private var isJoiningTrip = false
-    @State private var showingDeepLinkError = false
-    @State private var deepLinkErrorMessage = ""
+    @State private var deepLinkError: AnyAppError? = nil
 
     private var deepLinkService = DeepLinkService()
 
@@ -36,8 +35,8 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             if let deepLink = deepLinkService.handle(url: url) {
-                pendingTripId = deepLink[0]
-                pendingInviteToken = deepLink[1]
+                pendingTripId = deepLink.tripId
+                pendingInviteToken = deepLink.token
             }
             processDeepLinking()
         }
@@ -48,18 +47,14 @@ struct ContentView: View {
         }
         .environment(session)
         .overlay { joiningTripOverlay }
-        .alert("Could Not Join Trip", isPresented: $showingDeepLinkError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(deepLinkErrorMessage)
-        }
+        .alert(error: $deepLinkError)
     }
 }
 
 // MARK: - Views
-private extension ContentView {
-    
-    var mainContent: some View {
+extension ContentView {
+
+    fileprivate var mainContent: some View {
         NavigationStack(path: $router.path) {
             TripListView()
                 .navigationDestination(for: AppRoute.self, destination: destination)
@@ -72,7 +67,7 @@ private extension ContentView {
     }
 
     @ViewBuilder
-    func destination(for route: AppRoute) -> some View {
+    fileprivate func destination(for route: AppRoute) -> some View {
         switch route {
         case .notifications:
             EmptyView()
@@ -86,55 +81,68 @@ private extension ContentView {
     }
 
     @ViewBuilder
-    var joiningTripOverlay: some View {
+    fileprivate var joiningTripOverlay: some View {
         if isJoiningTrip {
             ZStack {
-                Color.black.opacity(0.3).ignoresSafeArea()
+                Color.black.opacity(0.4).ignoresSafeArea()
 
-                VStack(spacing: 16) {
+                VStack(spacing: 24) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.5)
-                    Text("Joining Trip...")
-                        .font(.headline)
+                        .tint(.accentColor)
+                    
+                    VStack(spacing: 6) {
+                        Text("Joining Trip...")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Getting things ready")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .padding(32)
-                .background(Color(uiColor: .systemBackground))
-                .cornerRadius(28)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 32)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 8)
             }
         }
     }
 }
 
 // MARK: - Deep Linking Logic
-private extension ContentView {
-    
-    func processDeepLinking() {
+extension ContentView {
+
+    fileprivate func processDeepLinking() {
         guard session.state == .loggedIn else {
             return
         }
 
         guard let tripId = pendingTripId, tripId != lastTripId, let token = pendingInviteToken else {
+            pendingTripId = nil
+            pendingInviteToken = nil
             return
         }
 
         router.popToRoot()
+
         isJoiningTrip = true
-        
+
         Task {
+
+            defer {
+                isJoiningTrip = false
+                pendingTripId = nil
+                pendingInviteToken = nil
+            }
+
             do {
                 let verifiedTripId = try await deepLinkService.joinTrip(tripId: tripId, inviteToken: token)
-                pendingTripId = nil
-                pendingInviteToken = nil
-                isJoiningTrip = false
                 router.navigateToTrip(tripId: verifiedTripId)
-            } catch {
-                print("Failed to join trip: \(error)")
-                deepLinkErrorMessage = error.localizedDescription
-                showingDeepLinkError = true
-                pendingTripId = nil
-                pendingInviteToken = nil
-                isJoiningTrip = false
+            } catch let error as APIError {
+                deepLinkError = AnyAppError(error)
             }
         }
     }

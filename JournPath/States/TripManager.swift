@@ -21,7 +21,7 @@ final class TripManager {
     }
 
     var currentUserIsKicked: Bool {
-        currentParticipant?.isKicked ?? false
+        currentParticipant?.status == .kicked
     }
 
     /// True once we've confirmed the user is an active participant of this trip.
@@ -136,7 +136,7 @@ final class TripManager {
                     let participant = try snapshot.data(as: Participant.self)
                     self.currentParticipant = participant
                     // If the doc is readable and shows kicked, treat as removed too.
-                    if participant.isKicked == true {
+                    if participant.status == .kicked {
                         self.wasRemoved = true
                     }
                 } catch {

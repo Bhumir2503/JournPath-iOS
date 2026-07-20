@@ -33,16 +33,10 @@ struct Trip: Identifiable, Codable, Hashable {
     // Timestamps
     var startDate: Date
     var endDate: Date
-    var initialEndDate: Date?
 
     // MetaData
-    var createdBy: String
     var createdAt: Date
     var updatedAt: Date?
-
-    // Deleted Flag
-    var isDeleted: Bool
-    var deletedAt: Date?
 
     // Premium Flag
     var tier: TripTier

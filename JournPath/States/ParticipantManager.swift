@@ -35,7 +35,7 @@ final class ParticipantManager {
             .collection("trips")
             .document(tripId)
             .collection("participants")
-            .whereField("isKicked", isEqualTo: false)
+            .whereField("status", isEqualTo: "accepted")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
@@ -67,7 +67,7 @@ final class ParticipantManager {
                     .collection("trips")
                     .document(tripId)
                     .collection("participants")
-                    .whereField("isKicked", isEqualTo: true)
+                    .whereField("status", isEqualTo: "kicked")
                     .addSnapshotListener { [weak self] snapshot, error in
                         guard let self = self else { return }
                         if let error = error {
@@ -102,8 +102,8 @@ final class ParticipantManager {
 
     func canKick(participant: Participant) -> Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.userId == currentUserId })?.role,
-              let targetId = participant.userId,
+              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
+              let targetId = participant.id,
               targetId != currentUserId else {
             return false
         }
@@ -118,8 +118,8 @@ final class ParticipantManager {
 
     func canChangeRole(of participant: Participant) -> Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.userId == currentUserId })?.role,
-              let targetId = participant.userId,
+              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
+              let targetId = participant.id,
               targetId != currentUserId else {
             return false
         }
@@ -128,7 +128,7 @@ final class ParticipantManager {
 
     func assignableRoles(for participant: Participant) -> [ParticipantRole] {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.userId == currentUserId })?.role else {
+              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role else {
             return []
         }
         
@@ -143,7 +143,7 @@ final class ParticipantManager {
 
     var isCaptain: Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.userId == currentUserId })?.role else {
+              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role else {
             return false
         }
         return currentUserRole == .captain

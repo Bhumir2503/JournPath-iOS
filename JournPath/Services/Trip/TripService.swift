@@ -113,12 +113,7 @@ final class TripService {
 // MARK: - User Management
 extension TripService {
     func regenerateInviteToken(tripId: String) async throws {
-        _ = try AuthUtils.requireUserId()
-        let updates: [String: Any] = [
-            "inviteToken": InviteTokenUtil.generate(),
-            "updatedAt": FieldValue.serverTimestamp(),
-        ]
-        try await db.collection("trips").document(tripId).updateData(updates)
+        try await APIClient.shared.post("/trip/regenerateInviteToken", body: ["tripId": tripId])
     }
 }
 

@@ -16,14 +16,12 @@ struct Attachment: Identifiable, Hashable, Codable {
 
     // Storage & Network
     var url: String
-    var thumbnailURL: String?  // <-- ADDED: The new backend-generated preview image
+    var thumbnailURL: String?
     var storagePath: String
     var sizeBytes: Int64
 
     // Timestamps & Archiving
     @ServerTimestamp var createdAt: Date?
-    var isArchived: Bool
-    var archivedAt: Date?
 
     init(tripId: String, userId: String, name: String, url: String, thumbnailURL: String? = nil, storagePath: String, sizeBytes: Int64, isPrivate: Bool) {
         self.tripId = tripId
@@ -35,7 +33,6 @@ struct Attachment: Identifiable, Hashable, Codable {
         self.thumbnailURL = thumbnailURL 
         self.storagePath = storagePath
         self.sizeBytes = sizeBytes
-        self.isArchived = false
     }
 
     var iconInfo: (icon: String, color: Color) {

@@ -53,10 +53,10 @@ struct ParticipantManagementView: View {
 
     private var activeSection: some View {
         Section {
-            ForEach(participantManager.sortedParticipants, id: \.userId) { participant in
+            ForEach(participantManager.sortedParticipants, id: \.id) { participant in
                 ParticipantRow(
                     participant: participant,
-                    isCurrentUser: participant.userId == sessionManager.currentUser?.uid
+                    isCurrentUser: participant.id == sessionManager.uid
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if participantManager.canKick(participant: participant) {
@@ -86,10 +86,10 @@ struct ParticipantManagementView: View {
     private var removedSection: some View {
         if participantManager.isCaptain && !participantManager.kickedParticipants.isEmpty {
             Section("Removed") {
-                ForEach(participantManager.kickedParticipants, id: \.userId) { participant in
+                ForEach(participantManager.kickedParticipants, id: \.id) { participant in
                     ParticipantRow(
                         participant: participant,
-                        isCurrentUser: participant.userId == sessionManager.currentUser?.uid
+                        isCurrentUser: participant.id == sessionManager.uid
                     )
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button {
@@ -145,11 +145,15 @@ struct ParticipantManagementView: View {
     // MARK: - Share payload
 
     var shareURL: URL? {
-        var components = URLComponents(string: "https://usemyjourney.com/join")
+        // 1. Build the path string with the tripId interpolated
+        let path = "https://journpath.com/invite/trip/\(tripManager.tripId)"
+
+        // 2. Use URLComponents to safely add the token query parameter
+        var components = URLComponents(string: path)
         components?.queryItems = [
-            URLQueryItem(name: "tripId", value: tripManager.tripId),
-            URLQueryItem(name: "inviteToken", value: tripManager.inviteToken),
+            URLQueryItem(name: "token", value: tripManager.inviteToken)
         ]
+
         return components?.url
     }
 
@@ -160,7 +164,7 @@ struct ParticipantManagementView: View {
     // MARK: - Actions
 
     func kickParticipant(participant: Participant) {
-        guard let targetId = participant.userId else { return }
+        guard let targetId = participant.id else { return }
         Task {
             do {
                 try await participantService.kickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
@@ -171,7 +175,7 @@ struct ParticipantManagementView: View {
     }
 
     func restoreParticipant(participant: Participant) {
-        guard let targetId = participant.userId else { return }
+        guard let targetId = participant.id else { return }
         Task {
             try? await participantService.undoKickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
         }
