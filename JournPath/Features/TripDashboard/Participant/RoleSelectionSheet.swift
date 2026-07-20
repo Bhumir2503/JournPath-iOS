@@ -128,7 +128,7 @@ struct RoleSelectionSheet: View {
                                 do {
                                     try await participantService.changeRole(
                                         tripId: tripManager.tripId,
-                                        userId: participant.userId!,
+                                        userId: participant.id!,
                                         role: selectedRole
                                     )
                                     withAnimation {

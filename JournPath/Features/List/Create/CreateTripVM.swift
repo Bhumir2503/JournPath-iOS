@@ -75,11 +75,11 @@ final class CreateTripViewModel {
                     "imageAuthor": backgroundAuthor ?? "Unknown",
                 ]
             ]
-            let result = try await APIClient.shared.post("createTrip", body: payload)
+            let result = try await APIClient.shared.post("/trip/create", body: payload)
             AppLogger.viewModels.info("Trip created: \(result)")
             return (result["result"] as? [String: Any])?["tripId"] as? String
         } catch {
-            AppLogger.viewModels.error("Error creating trip: \(error.localizedDescription)")
+            AppLogger.viewModels.error("Error creating trip: \(error)")
         }
         return nil
     }

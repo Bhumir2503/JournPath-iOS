@@ -30,32 +30,25 @@ enum ParticipantStatus: String, Codable {
     case invited
     case accepted
     case declined
-    case banned
+    case removed
+    case kicked
 }
 
 struct Participant: Codable, Identifiable {
-    var id: String { userId ?? "" }
-
-    @DocumentID var userId: String?
+    @DocumentID var id: String?
 
     let role: ParticipantRole
     let displayName: String
     let photoURL: String?
     let status: ParticipantStatus
-    let emergencyContactName: String?
-    let emergencyContactPhone: String?
     let joinedAt: Date
-    var isKicked: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case userId
+        case id
         case role
         case displayName
         case photoURL
         case status
-        case emergencyContactName
-        case emergencyContactPhone
         case joinedAt
-        case isKicked
     }
 }

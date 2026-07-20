@@ -17,7 +17,7 @@ class AppleAuthService: NSObject {
 
         let provider = ASAuthorizationAppleIDProvider()
         let request = provider.createRequest()
-        request.requestedScopes = [.fullName, .email]
+        request.requestedScopes = [.email]
         request.nonce = AuthCryptoUtils.sha256(nonce)
 
         let controller = ASAuthorizationController(authorizationRequests: [request])
@@ -106,13 +106,6 @@ extension AppleAuthService: ASAuthorizationControllerPresentationContextProvidin
             return window
         }
 
-        // Apple's API requires a non-optional anchor here, so this is a last resort.
-        if let windowScene = windowScene {
-            return UIWindow(windowScene: windowScene)
-        } else {
-            // Return a generic window to prevent a fatal crash, as delegates cannot throw
-            return UIWindow(frame: .zero)
-        }
-
+        return UIWindow(windowScene: windowScene!)
     }
 }

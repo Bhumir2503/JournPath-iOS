@@ -13,8 +13,8 @@ class UserDatabaseService {
     func updateProfile(displayName: String?, photoURL: String?) async throws {
         let uid = try AuthUtils.requireUserId()
         try await db.collection("users").document(uid).updateData([
-            "displayName": displayName,
-            "photoURL": photoURL
+            "displayName": displayName ?? "",
+            "photoURL": photoURL ?? ""
         ])
     }
     

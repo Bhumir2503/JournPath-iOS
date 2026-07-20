@@ -53,10 +53,10 @@ struct ParticipantManagementView: View {
 
     private var activeSection: some View {
         Section {
-            ForEach(participantManager.sortedParticipants, id: \.userId) { participant in
+            ForEach(participantManager.sortedParticipants, id: \.id) { participant in
                 ParticipantRow(
                     participant: participant,
-                    isCurrentUser: participant.userId == sessionManager.currentUser?.uid
+                    isCurrentUser: participant.id == sessionManager.uid
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if participantManager.canKick(participant: participant) {
@@ -86,10 +86,10 @@ struct ParticipantManagementView: View {
     private var removedSection: some View {
         if participantManager.isCaptain && !participantManager.kickedParticipants.isEmpty {
             Section("Removed") {
-                ForEach(participantManager.kickedParticipants, id: \.userId) { participant in
+                ForEach(participantManager.kickedParticipants, id: \.id) { participant in
                     ParticipantRow(
                         participant: participant,
-                        isCurrentUser: participant.userId == sessionManager.currentUser?.uid
+                        isCurrentUser: participant.id == sessionManager.uid
                     )
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button {
@@ -160,7 +160,7 @@ struct ParticipantManagementView: View {
     // MARK: - Actions
 
     func kickParticipant(participant: Participant) {
-        guard let targetId = participant.userId else { return }
+        guard let targetId = participant.id else { return }
         Task {
             do {
                 try await participantService.kickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
@@ -171,7 +171,7 @@ struct ParticipantManagementView: View {
     }
 
     func restoreParticipant(participant: Participant) {
-        guard let targetId = participant.userId else { return }
+        guard let targetId = participant.id else { return }
         Task {
             try? await participantService.undoKickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
         }
