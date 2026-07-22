@@ -4,32 +4,28 @@ import FirebaseFunctions
 import Foundation
 
 final class ParticipantService {
-    func kickParticipant(tripId: String, kickedUserId: String) async throws {
-        let functions = Functions.functions()
+    func kickParticipant(tripId: String, kickedUserId: String) async throws(APIError) {
         let data: [String: Any] = [
             "tripId": tripId,
-            "participantId": kickedUserId
+            "targetUid": kickedUserId,
         ]
-        _ = try await functions.httpsCallable("kickParticipant").call(data)
+        try await APIClient.shared.post("/trip/kick", body: data)
     }
 
-    func undoKickParticipant(tripId: String, kickedUserId: String) async throws {
-        let functions = Functions.functions()
+    func undoKickParticipant(tripId: String, kickedUserId: String) async throws(APIError) {
         let data: [String: Any] = [
             "tripId": tripId,
-            "participantId": kickedUserId
+            "targetUid": kickedUserId,
         ]
-        _ = try await functions.httpsCallable("unkickParticipant").call(data)
+        try await APIClient.shared.post("/trip/unkick", body: data)
     }
 
-    func changeRole(tripId: String, userId: String, role: ParticipantRole) async throws {
-        AppLogger.viewModels.info("changing role of user id: \(userId) to role: \(role.rawValue)")
-        let functions = Functions.functions()
+    func changeRole(tripId: String, userId: String, role: ParticipantRole) async throws(APIError) {
         let data: [String: Any] = [
             "tripId": tripId,
-            "participantId": userId,
-            "role": role.rawValue
+            "targetUid": userId,
+            "newRole": role.rawValue,
         ]
-        _ = try await functions.httpsCallable("updateParticipantRole").call(data)
+        try await APIClient.shared.post("/trip/updateRole", body: data)
     }
 }

@@ -19,18 +19,21 @@ enum DashboardAlert: Identifiable, Hashable {
 struct TripDashboardView: View {
     let tripId: String
 
-    // MARK: - MVS Components
+    // States
+
     @State private var tripManager: TripManager
+
+    // Services
     private let tripService = TripService()
+
+    // Envs
     @Environment(AppRouter.self) private var router
 
-    // MARK: - Local UI State (Unified)
+    // Local State
     @State private var activeSheet: DashboardSheet?
     @State private var activeAlert: DashboardAlert?
     @State private var newTripName = ""
     @State private var scrollOffset: CGFloat = 0
-    @State private var isSearchActive = false
-    @State private var searchText = ""
 
     // Guards so an ejection alert isn't re-triggered after we've handled it.
     @State private var hasHandledRemoval = false
@@ -67,7 +70,6 @@ struct TripDashboardView: View {
                 trip: tripManager.currentTrip,
                 activeSheet: $activeSheet,
                 activeAlert: $activeAlert,
-                isSearchActive: $isSearchActive,
                 shareURL: shareURL
             )
         }
@@ -91,7 +93,7 @@ struct TripDashboardView: View {
             case .rename:
                 TextField("Trip Name", text: $newTripName)
                 Button("Cancel", role: .cancel) {}
-                Button("Save") { renameTrip() }
+                Button("Save") { renameTrip() }.disabled(newTripName.isEmpty || newTripName == tripManager.currentTrip?.name)
             case .tripDeleted:
                 Button("OK") { router.popToRoot() }
             case .removed:
@@ -117,19 +119,22 @@ struct TripDashboardView: View {
             tripManager.startListening()
             requestNotificationPermission()
         }
-        // Ejection: captain kicked you (or your participant doc vanished).
         .onChange(of: tripManager.wasRemoved) { _, removed in
             guard removed, !hasHandledRemoval else { return }
             hasHandledRemoval = true
             activeAlert = .removed
         }
-        // Trip deleted out from under us: the trip doc no longer exists while
-        // we're viewing it. (currentTrip goes nil after having been non-nil.)
         .onChange(of: tripManager.currentTrip == nil) { wasNil, isNil in
-            // Only treat nil as "deleted" if we had previously loaded the trip.
             guard isNil, tripManager.hasLoadedOnce, !hasHandledRemoval else { return }
             hasHandledRemoval = true
             activeAlert = .tripDeleted
+        }
+        .onChange(of: tripManager.currentUserRole) { _, role in
+            if role == .observer {
+                if activeSheet == .itineraryBuilder {
+                    activeSheet = .none
+                }
+            }
         }
     }
 
@@ -139,11 +144,15 @@ struct TripDashboardView: View {
         GeometryReader { g in
             ScrollView {
                 ZStack(alignment: .top) {
-                    tripHeader(trip: trip, geometry: g)
-                        .offset(y: scrollOffset > 0 ? 0 : scrollOffset)
+                    TripDashboardHeader(
+                        trip: trip,
+                        geometry: g,
+                        scrollOffset: scrollOffset
+                    ).offset(y: scrollOffset > 0 ? 0 : scrollOffset)
 
                     VStack(spacing: 0) {
                         Color.clear.frame(height: g.size.height * 0.6)
+
                     }
                 }
             }
@@ -153,24 +162,6 @@ struct TripDashboardView: View {
         .ignoresSafeArea()
     }
 
-    @ViewBuilder
-    private func tripHeader(trip: Trip, geometry: GeometryProxy) -> some View {
-        KFImage(URL(string: trip.imageURL))
-            .placeholder {
-                if let blurImage = Image(blurHash: trip.imageBlurHash) {
-                    blurImage.resizable().scaledToFill()
-                }
-            }
-            .resizable()
-            .scaledToFill()
-            .frame(
-                width: geometry.size.width,
-                height: (geometry.size.height * 0.65)
-                    + (scrollOffset < 0 ? abs(scrollOffset) : 0)
-            )
-            .offset(y: scrollOffset > 0 ? min(scrollOffset, geometry.size.height * 0.45) : 0)
-            .clipped()
-    }
 }
 
 // MARK: - Helpers
@@ -182,7 +173,7 @@ extension TripDashboardView {
             ParticipantManagementView(tripId: tripId)
                 .presentationDragIndicator(.visible)
         case .storage:
-            EmptyView()
+            StorageHubView(tripId: tripId)
         case .itineraryBuilder:
             EmptyView()
         case .notes:

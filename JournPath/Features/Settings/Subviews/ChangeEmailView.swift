@@ -21,7 +21,7 @@ extension ChangeEmailError: LocalizedError {
 
 struct ChangeEmailView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(SessionStore.self) var session
+    @Environment(UserManager.self) var session
 
     @State private var currentPassword = ""
     @State private var newEmail = ""

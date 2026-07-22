@@ -3,8 +3,8 @@ import Kingfisher
 import SwiftUI
 
 struct ParticipantManagementView: View {
-    @Environment(SessionStore.self) private var sessionManager
-    @Environment(TripManager.self) private var tripManager
+    @Environment(UserManager.self) private var user
+    @Environment(TripManager.self) private var trip
     @State private var participantManager: ParticipantManager
 
     private var participantService = ParticipantService()
@@ -12,6 +12,8 @@ struct ParticipantManagementView: View {
     @State private var participantToKick: Participant?
     @State private var showKickAlert = false
     @State private var participantForRoleChange: Participant?
+
+    @State private var error: AnyAppError? = nil
 
     init(tripId: String) {
         _participantManager = State(initialValue: ParticipantManager(tripId: tripId))
@@ -33,7 +35,7 @@ struct ParticipantManagementView: View {
             .onDisappear { participantManager.stopListening() }
             .navigationTitle("Participants")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Remove Member?", isPresented: $showKickAlert, presenting: participantToKick) { participant in
+            .alert("Kick Member?", isPresented: $showKickAlert, presenting: participantToKick) { participant in
                 Button("Remove", role: .destructive) { kickParticipant(participant: participant) }
                 Button("Cancel", role: .cancel) {}
             } message: { participant in
@@ -56,7 +58,7 @@ struct ParticipantManagementView: View {
             ForEach(participantManager.sortedParticipants, id: \.id) { participant in
                 ParticipantRow(
                     participant: participant,
-                    isCurrentUser: participant.id == sessionManager.uid
+                    isCurrentUser: participant.id == user.uid
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if participantManager.canKick(participant: participant) {
@@ -89,7 +91,7 @@ struct ParticipantManagementView: View {
                 ForEach(participantManager.kickedParticipants, id: \.id) { participant in
                     ParticipantRow(
                         participant: participant,
-                        isCurrentUser: participant.id == sessionManager.uid
+                        isCurrentUser: participant.id == user.uid
                     )
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button {
@@ -146,19 +148,19 @@ struct ParticipantManagementView: View {
 
     var shareURL: URL? {
         // 1. Build the path string with the tripId interpolated
-        let path = "https://journpath.com/invite/trip/\(tripManager.tripId)"
+        let path = "https://journpath.com/invite/trip/\(trip.tripId)"
 
         // 2. Use URLComponents to safely add the token query parameter
         var components = URLComponents(string: path)
         components?.queryItems = [
-            URLQueryItem(name: "token", value: tripManager.inviteToken)
+            URLQueryItem(name: "token", value: trip.inviteToken)
         ]
 
         return components?.url
     }
 
     var sharePreviewTitle: String {
-        "Join me on my trip to \"\(tripManager.currentTrip?.name ?? "My Journey")\" on MyJourney"
+        "Join me on my trip to \"\(trip.currentTrip?.name ?? "My Journey")\" on MyJourney"
     }
 
     // MARK: - Actions
@@ -167,9 +169,9 @@ struct ParticipantManagementView: View {
         guard let targetId = participant.id else { return }
         Task {
             do {
-                try await participantService.kickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
-            } catch {
-                print("Error kicking participant: \(error)")
+                try await participantService.kickParticipant(tripId: trip.tripId, kickedUserId: targetId)
+            } catch let error as LocalizedError {
+                self.error = AnyAppError(error)
             }
         }
     }
@@ -177,7 +179,11 @@ struct ParticipantManagementView: View {
     func restoreParticipant(participant: Participant) {
         guard let targetId = participant.id else { return }
         Task {
-            try? await participantService.undoKickParticipant(tripId: tripManager.tripId, kickedUserId: targetId)
+            do {
+                try await participantService.undoKickParticipant(tripId: trip.tripId, kickedUserId: targetId)
+            } catch let error as LocalizedError {
+                self.error = AnyAppError(error)
+            }
         }
     }
 }

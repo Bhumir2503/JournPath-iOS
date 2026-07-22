@@ -17,7 +17,7 @@ enum AuthState {
 
 @MainActor
 @Observable
-class SessionStore {
+class UserManager {
     var currentUser: FirebaseAuth.User?
     var state: AuthState = .loading
     var isHandlingManualAuth: Bool = false
@@ -62,7 +62,7 @@ class SessionStore {
 }
 
 // MARK: - Computed Properties (Source of Truth: Firestore)
-extension SessionStore {
+extension UserManager {
     var uid: String? { currentUser?.uid }
 
     var displayName: String {

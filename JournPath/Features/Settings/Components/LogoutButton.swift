@@ -35,7 +35,7 @@ struct LogoutButton: View {
                 try? Auth.auth().signOut()
             }
         } message: {
-            Text("Are you sure you want to log out of MyJourney?")
+            Text("Are you sure you want to log out of JournPath?")
         }
     }
 }

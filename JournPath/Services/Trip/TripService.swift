@@ -12,7 +12,7 @@ final class TripService {
 
     private let db = Firestore.firestore()
 
-    func create(name: String, startDate: Date, endDate: Date, imageURL: String, imageColor: String, imageBlurHash: String, imageAuthor: String) async throws -> String {
+    func create(name: String, startDate: Date, endDate: Date, imageURL: String, imageColor: String, imageBlurHash: String, imageAuthor: String) async throws(APIError) -> String {
         let formatter = ISO8601DateFormatter()
 
         let payload: [String: Any] = [
@@ -35,7 +35,6 @@ final class TripService {
     }
 
     func rename(tripId: String, newName: String) async throws {
-        _ = try AuthUtils.requireUserId()
         let updates: [String: Any] = [
             "name": newName,
             "updatedAt": FieldValue.serverTimestamp(),
@@ -44,7 +43,6 @@ final class TripService {
     }
 
     func updateDates(tripId: String, startDate: Date, endDate: Date) async throws {
-        _ = try AuthUtils.requireUserId()
         // change to UTC
         let start = startDate.utcMidnight
         let end = endDate.utcMidnight
@@ -58,7 +56,6 @@ final class TripService {
     }
 
     func updateBackground(tripId: String, imageBlurHash: String, imageURL: String, imageColor: String, imageAuthor: String) async throws {
-        _ = try AuthUtils.requireUserId()
         let updates: [String: Any] = [
             "imageBlurHash": imageBlurHash,
             "imageURL": imageURL,

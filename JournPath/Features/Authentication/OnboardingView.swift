@@ -12,7 +12,7 @@ struct OnboardingView: View {
     @Environment(\.colorScheme) var colorScheme
     @State var authVM = AuthViewModel()
     @State var isShowingEmailForm: Bool = false
-    @Environment(SessionStore.self) private var session
+    @Environment(UserManager.self) private var session
 
     var body: some View {
         GeometryReader { geometry in

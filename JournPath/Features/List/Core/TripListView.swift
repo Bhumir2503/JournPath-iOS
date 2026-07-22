@@ -6,7 +6,7 @@ struct TripListView: View {
     @State private var manager = TripListManager()
 
     @Environment(AppRouter.self) private var router
-    @Environment(SessionStore.self) private var session
+    @Environment(UserManager.self) private var session
 
     @State private var isShowingCreateTrip: Bool = false
 

@@ -19,7 +19,7 @@ struct ActivityFormView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    mapHeader
+ 
 
                     VStack(alignment: .leading, spacing: 24) {
                         titleHeader
@@ -75,7 +75,7 @@ struct ActivityFormView: View {
                 DatePickerView(
                     initialStartDate: vm.startDate,
                     initialEndDate: vm.endDate,
-                    dateRange: vm.validDateRange(trip: tripManager.currentTrip),
+
                     onCancel: {
                         showingDatePicker = false
                     },
@@ -107,12 +107,6 @@ struct ActivityFormView: View {
 
     // MARK: - Extracted Views
 
-    @ViewBuilder
-    private var mapHeader: some View {
-        if let coordinate = vm.place.coordinate {
-            StaticMapSnapshotView(coordinate: coordinate, height: 350)
-        }
-    }
 
     @ViewBuilder
     private var titleHeader: some View {

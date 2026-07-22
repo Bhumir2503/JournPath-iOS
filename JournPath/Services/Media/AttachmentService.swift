@@ -26,19 +26,7 @@ class AttachmentService {
         return try await localMediaService.processInputURL(url)
     }
 
-    func uploadData(tripId: String, fileName: String, fileData: Data, mimeType: String, onStateChange: @escaping (UploadState) -> Void) async throws {
-        // 1. GENERATE IDENTIFIERS
-        let fileId = UUID().uuidString
-        let storagePath = "trips/\(tripId)/\(fileId)"
 
-        // 2. GET USER ID
-        let userId = try AuthUtils.requireUserId()
-
-        // 3. UPLOAD DATA
-        let _ = try await fileStorageService.upload(data: fileData, path: storagePath, tripId: tripId, fileId: fileId, mimeType: mimeType, fileName: fileName, userId: userId) { progress in
-            onStateChange(.uploading(progress: progress))
-        }
-    }
 
     func rename(tripId: String, attachmentId: String, newName: String) async throws {
         try await fileDatabaseService.renameAttachment(tripId: tripId, attachmentId: attachmentId, newName: newName)
