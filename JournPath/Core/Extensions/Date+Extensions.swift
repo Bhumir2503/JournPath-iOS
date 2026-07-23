@@ -46,13 +46,6 @@ extension Date {
         return Calendar.current.date(from: components) ?? self
     }
 
-    var displayStringUTC: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        formatter.timeZone = TimeZone(identifier: "UTC")!
-        return formatter.string(from: self)
-    }
 
     func isSameUTCDay(as other: Date) -> Bool {
         var utcCalendar = Calendar(identifier: .gregorian)

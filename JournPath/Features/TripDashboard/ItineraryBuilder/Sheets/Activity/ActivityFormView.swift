@@ -13,7 +13,7 @@ struct ActivityFormView: View {
     @State private var showingAttachmentsSheet = false
     @State private var showingNotesSheet = false
     @State private var isSaving = false
-    
+
     @State private var participantManager: ParticipantManager?
     @State private var isSplitEnabled = false
     @State private var participantAmounts: [String: Double] = [:]
@@ -45,6 +45,7 @@ struct ActivityFormView: View {
                     .padding(.bottom, 8)
             }
             .onAppear {
+                vm.computeSelectableRange(trip: tripManager.currentTrip)
                 vm.setupDates(trip: tripManager.currentTrip)
                 if participantManager == nil, let tripId = tripManager.currentTrip?.id {
                     participantManager = ParticipantManager(tripId: tripId)
@@ -117,107 +118,93 @@ struct ActivityFormView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(spacing: 0) {
                 HStack {
-                    Text("Dates")
+                    Text("Starts")
                     Spacer()
-                    Group {
-                        if Calendar.current.isDate(vm.startDate, inSameDayAs: vm.endDate) {
-                            Text(vm.startDate.displayString())
-                        } else {
-                            HStack(spacing: 8) {
-                                Text(vm.startDate.displayString())
-                                Image(systemName: "arrow.right")
-                                Text(vm.endDate.displayString())
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(UIColor.tertiarySystemFill))
-                    .clipShape(.capsule)
-                    .onTapGesture {
-                        showingDatePicker = true
+                    DatePicker(
+                        "", selection: $vm.startDate,
+                        in: vm.selectableRange,
+                        displayedComponents: vm.isAllDay ? .date : [.date, .hourAndMinute]
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                    .environment(\.timeZone, vm.destinationTimeZone)
+                    .onChange(of: vm.startDate) {
+                        withAnimation { vm.validateEndDate() }
                     }
                 }
                 .padding()
 
                 Divider().padding(.leading, 16)
-                Toggle("All Day", isOn: $vm.isAllDay.animation(.easeInOut))
-                    .padding()
 
-                if !vm.isAllDay {
-                    Divider().padding(.leading, 16)
-                    HStack {
-                        Text("Start Time")
-                        Spacer()
-                        DatePicker("", selection: $vm.startDate, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .fixedSize()
-                            .onChange(of: vm.startDate) {
-                                withAnimation {
-                                    vm.validateEndDate()
-                                }
-                            }
-                    }
-                    .padding()
-
-                    Divider().padding(.leading, 16)
-                    HStack {
-                        Text("End Time")
-                        Spacer()
-                        DatePicker("", selection: $vm.endDate, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .fixedSize()
-                    }
-                    .padding()
+                HStack {
+                    Text("Ends")
+                    Spacer()
+                    DatePicker(
+                        "", selection: $vm.endDate,
+                        in: vm.endSelectableRange,
+                        displayedComponents: vm.isAllDay ? .date : [.date, .hourAndMinute]
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                    .environment(\.timeZone, vm.destinationTimeZone)
                 }
+                .padding()
+
+                Divider().padding(.leading, 16)
+
+                Toggle("All Day", isOn: $vm.isAllDay)
+                    .padding()
+                    .onChange(of: vm.isAllDay) { _, newValue in
+                        withAnimation(.easeInOut) { vm.handleAllDayChange(newValue) }
+                    }
             }
             .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(28)
 
-            if !vm.isAllDay {
-                HStack {
-                    Image(systemName: "info.circle.fill")
-                    Text("Times shown in \(vm.destinationTimeZone.identifier) timezone")
-                }
-                .padding(.horizontal, 12)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: vm.hasResolvedTimeZone ? "info.circle.fill" : "exclamationmark.triangle.fill")
+                Text(
+                    vm.hasResolvedTimeZone
+                        ? "Times shown in \(vm.timeZoneDisplayName)"
+                        : "Couldn't determine this place's time zone — using \(vm.timeZoneDisplayName).")
             }
+            .padding(.horizontal, 12)
+            .font(.caption)
+            .foregroundStyle(vm.hasResolvedTimeZone ? .secondary : .primary)
         }
-        .animation(.easeInOut, value: vm.isAllDay)
     }
 
     @ViewBuilder
     private var costSection: some View {
         let hasMultipleParticipants = (participantManager?.sortedParticipants.count ?? 0) > 1
-        
+
         VStack(spacing: 0) {
             ActionRowView(icon: "dollarsign.circle.fill", title: "Amount", value: "10.00 USD", showDivider: hasMultipleParticipants) {
                 showingAmountSheet = true
             }
-            
+
             if hasMultipleParticipants {
                 HStack(spacing: 16) {
                     Image(systemName: "person.2.fill")
                         .foregroundColor(.secondary)
                         .frame(width: 24, height: 24)
-                    
+
                     Toggle("Split Expense", isOn: $isSplitEnabled.animation())
                 }
                 .padding(.leading, 16)
                 .padding(.trailing, 16)
                 .padding(.vertical, 14)
-                
+
                 if isSplitEnabled {
                     Divider().padding(.leading, 16)
-                    
+
                     VStack(alignment: .leading, spacing: 0) {
-        
+
                         if let participantManager = participantManager {
                             VStack(spacing: 0) {
                                 ForEach(Array(participantManager.sortedParticipants.enumerated()), id: \.element.id) { index, participant in
                                     let amount = participantAmounts[participant.id ?? ""] ?? 0.0
-                                    
+
                                     Button {
                                         selectedParticipantForAmount = participant
                                     } label: {
@@ -234,13 +221,13 @@ struct ActivityFormView: View {
                                                     .frame(width: 28, height: 28)
                                                     .foregroundColor(.secondary)
                                             }
-                                            
+
                                             Text(participant.displayName)
                                                 .font(.subheadline)
                                                 .foregroundColor(.primary)
-                                            
+
                                             Spacer()
-                                            
+
                                             Text(String(format: "$%.2f", amount))
                                                 .font(.subheadline)
                                                 .foregroundColor(.secondary)
@@ -249,7 +236,7 @@ struct ActivityFormView: View {
                                         .padding(.horizontal, 16)
                                     }
                                     .buttonStyle(.plain)
-                                    
+
                                     if index < participantManager.sortedParticipants.count - 1 {
                                         Divider().padding(.leading, 56)
                                     }

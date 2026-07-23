@@ -20,6 +20,7 @@ struct PlaceResult: Identifiable, Hashable {
     let subtitle: String
     let coordinate: CLLocationCoordinate2D?  // not Hashable, excluded below
     let mapItem: MKMapItem?
+    var timeZone: TimeZone?
 
     // Equality and hashing via id only — coordinate isn't Hashable
     static func == (lhs: PlaceResult, rhs: PlaceResult) -> Bool { lhs.id == rhs.id }

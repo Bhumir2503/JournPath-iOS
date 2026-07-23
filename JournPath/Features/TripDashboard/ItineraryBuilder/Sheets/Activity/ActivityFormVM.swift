@@ -7,8 +7,13 @@ import SwiftUI
 @Observable
 @MainActor
 final class ActivityFormVM {
+
+    // MARK: - Dependencies
+
     let place: PlaceResult
     let service = ItineraryService()
+
+    // MARK: - Form State
 
     var startDate: Date
     var endDate: Date
@@ -23,118 +28,164 @@ final class ActivityFormVM {
 
     var isAddressCopied: Bool = false
 
+    /// The trip's day range expressed as instants in the destination's zone.
+    /// Recomputed in `computeSelectableRange(trip:)` before the pickers render.
+    private(set) var selectableRange: ClosedRange<Date> = Date.distantPast...Date.distantFuture
+
+    // MARK: - Timezone
+
+    /// The timezone the activity actually happens in — resolved from the place
+    /// in ItineraryBuilderVM before this form is presented.
+    var destinationTimeZone: TimeZone {
+        place.timeZone ?? .current
+    }
+
+    /// False when neither MapKit nor the geocoder could resolve a zone, so the
+    /// form can warn that it's falling back to the device's timezone.
+    var hasResolvedTimeZone: Bool {
+        place.timeZone != nil
+    }
+
+    /// Calendar pinned to the destination. ALL date math in this VM uses this,
+    /// never Calendar.current — startDate/endDate are true instants whose
+    /// wall-clock meaning is defined by the destination's zone.
+    var placeCalendar: Calendar {
+        Calendar.pinned(to: destinationTimeZone)
+    }
+
+    var timeZoneDisplayName: String {
+        destinationTimeZone.localizedName(for: .generic, locale: .current)
+            ?? destinationTimeZone.identifier
+    }
+
+    // MARK: - Init
+
     init(place: PlaceResult) {
         self.place = place
-        let fallbackStart = Date()
-        self.startDate = fallbackStart
-        self.endDate = fallbackStart.addingTimeInterval(3600)
+        let fallback = Date()
+        self.startDate = fallback
+        self.endDate = fallback.addingTimeInterval(3600)
     }
 
+    // MARK: - Date Setup
+
+    /// Must run before `setupDates` and before the pickers evaluate their `in:` bounds.
+    func computeSelectableRange(trip: Trip?) {
+        guard let trip else { return }
+
+        var startComps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
+        startComps.hour = 0
+        startComps.minute = 0
+
+        var endComps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.endDate)
+        endComps.hour = 23
+        endComps.minute = 59
+
+        guard let lower = placeCalendar.date(from: startComps),
+            let upper = placeCalendar.date(from: endComps)
+        else { return }
+
+        selectableRange = lower...max(lower, upper)
+    }
+
+    /// Defaults to 10:00 AM on the trip's first day, in the destination's zone.
     func setupDates(trip: Trip?) {
-        let baseDate = trip?.startDate.deviceLocalFromUTCMidnight ?? Date()
-        let fallbackStart = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: baseDate) ?? baseDate
-        self.startDate = fallbackStart
-        self.endDate = fallbackStart.addingTimeInterval(3600)
+        guard let trip else {
+            startDate = Date()
+            endDate = startDate.addingTimeInterval(3600)
+            return
+        }
+
+        var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
+        comps.hour = 10
+        comps.minute = 0
+
+        let start = placeCalendar.date(from: comps) ?? Date()
+        startDate = clampToRange(start)
+        endDate = clampToRange(start.addingTimeInterval(3600))
+
+        if isAllDay {
+            handleAllDayChange(true)
+        }
     }
 
-    func validDateRange(trip: Trip?) -> ClosedRange<Date> {
-        let start = trip?.startDate.deviceLocalFromUTCMidnight ?? Date.distantPast
-        let end = trip?.endDate.deviceLocalFromUTCMidnight ?? Date.distantFuture
-        return start...max(start, end)
+    /// End can't precede start, and can't leave the trip.
+    var endSelectableRange: ClosedRange<Date> {
+        let lower = max(startDate, selectableRange.lowerBound)
+        return lower...max(lower, selectableRange.upperBound)
     }
 
-    /// The timezone the activity actually happens in — derived from the
-    /// selected place, not the device's current location. Falls back to
-    /// the device timezone only if MapKit couldn't resolve one (e.g. the
-    /// place was never resolved to a full MKMapItem).
-    var destinationTimeZone: TimeZone {
-        place.mapItem?.timeZone ?? TimeZone.current
+    private func clampToRange(_ date: Date) -> Date {
+        min(max(date, selectableRange.lowerBound), selectableRange.upperBound)
     }
+
+    // MARK: - Date Mutation
 
     func validateEndDate() {
         if endDate < startDate {
-            endDate = startDate.addingTimeInterval(3600)
+            endDate =
+                isAllDay
+                ? startDate
+                : min(startDate.addingTimeInterval(3600), selectableRange.upperBound)
         }
     }
 
-    func copyAddress() {
-        let addressText = !place.subtitle.isEmpty ? place.subtitle : "Location Coordinates Available"
-        UIPasteboard.general.string = addressText
-        withAnimation {
-            isAddressCopied = true
+    func handleAllDayChange(_ isAllDay: Bool) {
+        if isAllDay {
+            startDate = clampToRange(placeCalendar.startOfDay(for: startDate))
+            endDate = clampToRange(placeCalendar.startOfDay(for: endDate))
+        } else {
+            let start = placeCalendar.date(bySettingHour: 10, minute: 0, second: 0, of: startDate) ?? startDate
+            startDate = clampToRange(start)
+            endDate = clampToRange(startDate.addingTimeInterval(3600))
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                self.isAddressCopied = false
-            }
-        }
+        validateEndDate()
     }
 
-    var infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] {
-        var items: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] = []
-        let addressText = !place.subtitle.isEmpty ? place.subtitle : "Location Coordinates Available"
+    /// Keeps the existing clock times while moving both dates to new days.
+    func updateDates(newStart: Date, newEnd: Date) {
+        let cal = placeCalendar
+        let startTime = cal.dateComponents([.hour, .minute], from: startDate)
+        let endTime = cal.dateComponents([.hour, .minute], from: endDate)
 
-        items.append(
-            (
-                "mappin.and.ellipse", addressText, false,
-                { [weak self] in
-                    self?.copyAddress()
-                }
-            ))
+        var s = cal.dateComponents([.year, .month, .day], from: newStart)
+        s.hour = startTime.hour
+        s.minute = startTime.minute
 
-        if let mapItem = place.mapItem {
-            if let phone = mapItem.phoneNumber, !phone.isEmpty {
-                items.append(
-                    (
-                        "phone.fill", phone, true,
-                        {
-                            let digits = phone.filter { $0.isNumber || $0 == "+" }
-                            if let url = URL(string: "tel://\(digits)"), UIApplication.shared.canOpenURL(url) {
-                                UIApplication.shared.open(url)
-                            }
-                        }
-                    ))
-            }
-            if let websiteURL = mapItem.url {
-                let cleanURL = websiteURL.absoluteString
-                    .replacingOccurrences(of: "https://", with: "")
-                    .replacingOccurrences(of: "http://", with: "")
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                items.append(
-                    (
-                        "link", cleanURL, true,
-                        {
-                            UIApplication.shared.open(websiteURL)
-                        }
-                    ))
-            }
-        }
-        return items
+        var e = cal.dateComponents([.year, .month, .day], from: newEnd)
+        e.hour = endTime.hour
+        e.minute = endTime.minute
+
+        startDate = clampToRange(cal.date(from: s) ?? newStart)
+        endDate = clampToRange(cal.date(from: e) ?? newEnd)
+        validateEndDate()
     }
+
+    // MARK: - Save
 
     func saveActivity(tripId: String) async throws {
-        let location = ActivityLocation(
-            mapItem: place.mapItem!
-        )
+        guard let mapItem = place.mapItem else {
+            throw ActivityFormError.missingLocation
+        }
 
-        // Anchor both start and end to the destination's own timezone,
-        // not the device's current timezone.
         let tzId = destinationTimeZone.identifier
-        // change date to timezone so june 22, 2026 at 3:00 pm est becomes june 22, 2026 at 3;00 pm Asia/Tokyo
-        let trueStart = startDate.reanchored(to: destinationTimeZone)
-        let trueEnd = endDate.reanchored(to: destinationTimeZone)
 
-        let start = LocalDateTime(instant: trueStart, timeZoneId: tzId)
-        let end = LocalDateTime(instant: trueEnd, timeZoneId: tzId)
+        // startDate/endDate are already correct instants — the pickers were
+        // pinned to destinationTimeZone, so no conversion is needed here.
+        var trueStart = startDate
+        var trueEnd = endDate
 
-        let mappedCategory = mapToActivityCategory(place.mapItem?.pointOfInterestCategory)
+        if isAllDay {
+            trueStart = placeCalendar.startOfDay(for: trueStart)
+            trueEnd = placeCalendar.startOfDay(for: trueEnd)
+        }
 
         let activityPayload = ActivityPayload(
             title: place.title,
-            category: mappedCategory,
-            location: location,
-            start: start,
-            end: end,
+            category: mapToActivityCategory(mapItem.pointOfInterestCategory),
+            location: ActivityLocation(mapItem: mapItem),
+            start: LocalDateTime(instant: trueStart, timeZoneId: tzId),
+            end: LocalDateTime(instant: trueEnd, timeZoneId: tzId),
             allDay: isAllDay,
             participants: nil
         )
@@ -158,30 +209,72 @@ final class ActivityFormVM {
             stay: nil,
             transit: nil
         )
-        print("Step 2")
-        do {
-            print(newActivity.tripId)
-            try await service.saveItem(newActivity)
-        } catch {
-            print("Error saving activity: \(error)")
+
+        try await service.saveItem(newActivity)
+    }
+
+    // MARK: - Address / Info
+
+    func copyAddress() {
+        UIPasteboard.general.string =
+            place.subtitle.isEmpty
+            ? "Location Coordinates Available"
+            : place.subtitle
+
+        withAnimation { isAddressCopied = true }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation { isAddressCopied = false }
         }
-        print("Step 3")
     }
 
-    func updateDates(newStart: Date, newEnd: Date) {
-        let startComps = Calendar.current.dateComponents([.hour, .minute], from: self.startDate)
-        let endComps = Calendar.current.dateComponents([.hour, .minute], from: self.endDate)
+    var infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] {
+        var items: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] = []
+        let addressText = place.subtitle.isEmpty ? "Location Coordinates Available" : place.subtitle
 
-        var newStartComps = Calendar.current.dateComponents([.year, .month, .day], from: newStart)
-        newStartComps.hour = startComps.hour
-        newStartComps.minute = startComps.minute
+        items.append(
+            (
+                "mappin.and.ellipse", addressText, false,
+                { [weak self] in
+                    self?.copyAddress()
+                }
+            ))
 
-        var newEndComps = Calendar.current.dateComponents([.year, .month, .day], from: newEnd)
-        newEndComps.hour = endComps.hour
-        newEndComps.minute = endComps.minute
+        if let mapItem = place.mapItem {
+            if let phone = mapItem.phoneNumber, !phone.isEmpty {
+                items.append(
+                    (
+                        "phone.fill", phone, true,
+                        {
+                            let digits = phone.filter { $0.isNumber || $0 == "+" }
+                            if let url = URL(string: "tel://\(digits)"),
+                                UIApplication.shared.canOpenURL(url)
+                            {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    ))
+            }
 
-        self.startDate = Calendar.current.date(from: newStartComps) ?? newStart
-        self.endDate = Calendar.current.date(from: newEndComps) ?? newEnd
-        validateEndDate()
+            if let websiteURL = mapItem.url {
+                let clean = websiteURL.absoluteString
+                    .replacingOccurrences(of: "https://", with: "")
+                    .replacingOccurrences(of: "http://", with: "")
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                items.append(
+                    (
+                        "link", clean, true,
+                        {
+                            UIApplication.shared.open(websiteURL)
+                        }
+                    ))
+            }
+        }
+        return items
     }
+}
+
+enum ActivityFormError: LocalizedError {
+    case missingLocation
+    var errorDescription: String? { "This place is missing location details." }
 }

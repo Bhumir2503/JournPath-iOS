@@ -51,8 +51,8 @@ final class TripManager {
     }
 
     var dateRangeString: String {
-        guard let start = currentTrip?.startDate, let end = currentTrip?.endDate else { return "" }
-        return "\(start.displayStringUTC) - \(end.displayStringUTC)"
+        guard let trip = currentTrip else { return "" }
+        return trip.dateRangeTextViaInterval
     }
 
     // MARK: - Lifecycle Management

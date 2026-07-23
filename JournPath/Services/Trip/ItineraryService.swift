@@ -7,14 +7,14 @@ final class ItineraryService {
     private let db = Firestore.firestore()
 
     func saveItem(_ item: ItineraryItem) async throws {
-        let docRef = db.collection("trips").document(item.tripId).collection("itinerary").document()
+        let docRef = db.collection("trips").document(item.tripId).collection("itineraryItems").document()
         try docRef.setData(from: item)
     }
 
     func listenToItinerary(tripId: String, completion: @escaping ([ItineraryItem]?, Error?) -> Void) -> () -> Void {
         let listener = db.collection("trips")
             .document(tripId)
-            .collection("itinerary")
+            .collection("itineraryItems")
             .order(by: "startTime")
             .order(by: "endTime")
             .addSnapshotListener { querySnapshot, error in

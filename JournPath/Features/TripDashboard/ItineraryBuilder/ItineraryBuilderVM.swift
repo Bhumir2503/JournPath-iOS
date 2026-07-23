@@ -153,17 +153,28 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
     }
 
     func routeResolvedItem(_ resolved: PlaceResult) {
-        let type = searchTokens.first?.type ?? .activity
-        switch type {
-        case .lodging:
-            activeSheet = .stay(resolved)
-        case .transit:
-            activeSheet = .transit(resolved)
-        case .flight:
-            activeSheet = .flight(resolved)
-        default:
-            activeSheet = .activity(resolved)
+        Task {
+            var place = resolved
+            place.timeZone = await resolveTimeZone(for: resolved)
+
+            let type = searchTokens.first?.type ?? .activity
+            switch type {
+            case .lodging: activeSheet = .stay(place)
+            case .transit: activeSheet = .transit(place)
+            case .flight: activeSheet = .flight(place)
+            default: activeSheet = .activity(place)
+            }
         }
+    }
+
+    private func resolveTimeZone(for place: PlaceResult) async -> TimeZone? {
+        if let tz = place.mapItem?.timeZone { return tz }
+        guard let coordinate = place.coordinate else { return nil }
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
+            return placemark.timeZone
+        }
+        return nil
     }
 
     // MARK: - Search

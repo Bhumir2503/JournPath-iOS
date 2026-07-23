@@ -97,12 +97,14 @@ struct CalendarViewRepresentable: UIViewRepresentable {
             }
         }
 
-        // Land on the month containing the current selection, or the first
-        // selectable day (which is today in the unconstrained case, and the
-        // range's start when a trip range is passed in).
+        // Land on the month containing the current selection, or today's date if
+        // no date is selected and there's no strict date range (unconstrained case).
+        // If there is a strict range, land on its start date.
         DispatchQueue.main.async {
+            let defaultDate = vm.selectedStartDate ?? (vm.requiresEndOnOrAfterToday ? vm.today : vm.selectableRange.lowerBound)
+            
             calendarView.scroll(
-                toMonthContaining: vm.selectedStartDate ?? vm.selectableRange.lowerBound,
+                toMonthContaining: defaultDate,
                 scrollPosition: .firstFullyVisiblePosition(padding: 0),
                 animated: false
             )
