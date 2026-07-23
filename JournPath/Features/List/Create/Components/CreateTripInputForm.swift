@@ -65,15 +65,15 @@ extension CreateTripView {
 
         private var datePickerView: some View {
             DatePickerView(
-                initialStartDate: viewModel.startDate,
-                initialEndDate: viewModel.endDate,
+                initialStartDate: viewModel.startDate?.toPickerDate(),
+                initialEndDate: viewModel.endDate?.toPickerDate(),
                 onCancel: {
                     isFocused = true
                     showingDatePicker = false
                 },
                 onSubmit: { start, end in
-                    viewModel.startDate = start
-                    viewModel.endDate = end
+                    viewModel.startDate = start.toTripDate()
+                    viewModel.endDate = end.toTripDate()
                     showingDatePicker = false
                     isFocused = true
                 }
@@ -92,19 +92,32 @@ extension CreateTripView {
 
         var body: some View {
             Group {
-                if Calendar.current.isDate(viewModel.startDate, inSameDayAs: viewModel.endDate) {
-                    Text(viewModel.startDate.displayString())
-                } else {
-                    HStack(spacing: 8) {
-                        Text(viewModel.startDate.displayString())
-                        Image(systemName: "arrow.right")
-                        Text(viewModel.endDate.displayString())
+                if let start = viewModel.startDate, let end = viewModel.endDate {
+                    let startYear = Calendar.current.component(.year, from: start.toPickerDate())
+                    let endYear = Calendar.current.component(.year, from: end.toPickerDate())
+                    
+                    if Calendar.current.isDate(start.toPickerDate(), inSameDayAs: end.toPickerDate()) {
+                        Text(formatDate(start.toPickerDate(), includeYear: startYear != Calendar.current.component(.year, from: Date())))
+                    } else {
+                        HStack(spacing: 8) {
+                            Text(formatDate(start.toPickerDate(), includeYear: startYear != endYear))
+                            Image(systemName: "arrow.right")
+                            Text(formatDate(end.toPickerDate(), includeYear: startYear != endYear))
+                        }
                     }
+                } else {
+                    Text("Dates Not Set")
                 }
             }
             .foregroundColor(viewModel.dynamicTextColor.opacity(0.8))
             .fontWeight(.bold)
             .padding(.bottom)
+        }
+        
+        private func formatDate(_ date: Date, includeYear: Bool) -> String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = includeYear ? "MMM d, yyyy" : "MMM d"
+            return formatter.string(from: date)
         }
     }
     // MARK: - Action Buttons
@@ -123,7 +136,7 @@ extension CreateTripView {
                         Image(systemName: "calendar")
                             .font(.title3)
                             .padding(.bottom, 2)
-                        Text( "Change Dates" )
+                        Text("Change Dates")
                             .font(.headline.bold())
                     }
                 }

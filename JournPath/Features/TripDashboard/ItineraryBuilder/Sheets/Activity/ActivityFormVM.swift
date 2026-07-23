@@ -126,7 +126,6 @@ final class ActivityFormVM {
 
         let start = LocalDateTime(instant: trueStart, timeZoneId: tzId)
         let end = LocalDateTime(instant: trueEnd, timeZoneId: tzId)
-        print("Step 1")
 
         let mappedCategory = mapToActivityCategory(place.mapItem?.pointOfInterestCategory)
 

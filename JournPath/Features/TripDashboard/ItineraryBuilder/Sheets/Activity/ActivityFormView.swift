@@ -51,22 +51,6 @@ struct ActivityFormView: View {
                     participantManager?.startListening()
                 }
             }
-            .sheet(isPresented: $showingDatePicker) {
-                DatePickerView(
-                    initialStartDate: vm.startDate,
-                    initialEndDate: vm.endDate,
-
-                    onCancel: {
-                        showingDatePicker = false
-                    },
-                    onSubmit: { start, end in
-                        vm.updateDates(newStart: start, newEnd: end)
-                        showingDatePicker = false
-                    }
-                )
-                .presentationDetents([.fraction(0.7)])
-                .presentationDragIndicator(.visible)
-            }
             .sheet(isPresented: $showingAmountSheet) {
                 Text("Amount Sheet")
             }

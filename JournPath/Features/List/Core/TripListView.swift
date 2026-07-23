@@ -158,16 +158,10 @@ extension TripListView {
 
                         Text(trip.name).fontWeight(.bold)
 
-                        HStack {
-                            Text(trip.startDate.displayStringUTC)
-                            if !trip.startDate.isSameUTCDay(as: trip.endDate) {
-                                Image(systemName: "arrow.right")
-                                Text(trip.endDate.displayStringUTC)
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fontWeight(.semibold)
+                        Text(trip.dateRangeTextViaInterval)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.semibold)
                     }
 
                     Spacer()
