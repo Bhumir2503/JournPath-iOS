@@ -7,7 +7,6 @@ struct TripDashboardToolbar: ToolbarContent {
     // Bindings are "events" that the View handles
     @Binding var activeSheet: DashboardSheet?
     @Binding var activeAlert: DashboardAlert?
-    @Binding var isSearchActive: Bool
     let shareURL: URL?
 
     @Environment(AppRouter.self) private var router
@@ -38,81 +37,18 @@ struct TripDashboardToolbar: ToolbarContent {
             .disabled(trip == nil)
 
             // Command Menu
-            Menu {
-                Button {
-                    activeAlert = .rename
-                } label: {
-                    Label("Rename Trip", systemImage: "pencil")
-                }
-                Button {
-                    activeSheet = .datePicker
-                } label: {
-                    Label("Update Dates", systemImage: "calendar")
-                }
-                Button {
-                    activeSheet = .imagePicker
-                } label: {
-                    Label("Change Background", systemImage: "photo")
-                }
-
-                Divider()
-
-                Button {
-                    activeSheet = .participant
-                } label: {
-                    Label("Participants", systemImage: "person.3")
-                }
-
-                Divider()
-
-                Button {
-                    // Upgrade action
-                } label: {
-                    Label("Upgrade to Pro", systemImage: "sparkles")
-                        .foregroundStyle(.blue)
-                }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    activeAlert = .leave
-                } label: {
-                    Label("Leave Trip", systemImage: "rectangle.portrait.and.arrow.right")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-            }
-            .disabled(trip == nil)
+            TripDashboardMenu(
+                trip: trip,
+                activeSheet: $activeSheet,
+                activeAlert: $activeAlert
+            )
         }
 
         ToolbarItemGroup(placement: .bottomBar) {
-            Button {
-                activeSheet = .storage
-            } label: {
-                Label("Storage", systemImage: "folder")
-            }
-
-            Button {
-                activeSheet = .storage
-            } label: {
-                Label("Expenses", systemImage: "dollarsign.circle")
-            }
-
-            Button {
-                activeSheet = .storage
-            } label: {
-                Label("Notes", systemImage: "list.bullet.clipboard")
-            }
-
-            Spacer()
-
-            Button {
-                activeSheet = .itineraryBuilder
-            } label: {
-                Label("Add Activity", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(trip == nil)
+            TripDashboardBottomBar(
+                trip: trip,
+                activeSheet: $activeSheet
+            )
         }
     }
 }

@@ -1,5 +1,5 @@
-import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFirestore
 import Foundation
 import Observation
 import SwiftUI
@@ -7,6 +7,7 @@ import SwiftUI
 @Observable
 final class ParticipantManager {
     // MARK: - State
+    var selfParticipant: Participant? = nil
     var participants: [Participant] = []
     var kickedParticipants: [Participant] = []
 
@@ -39,22 +40,20 @@ final class ParticipantManager {
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
-                if let error = error {
-                    AppLogger.managers.error("[ParticipantManager.swift] Listener error: \(error.localizedDescription)")
+                if error != nil {
                     return
                 }
 
                 guard let documents = snapshot?.documents else { return }
-                
+
                 self.participants = documents.compactMap { doc in
                     do {
                         return try doc.data(as: Participant.self)
                     } catch {
-                        AppLogger.managers.error("[ParticipantManager.swift] Decode failed for \(doc.documentID): \(error.localizedDescription)")
                         return nil
                     }
                 }
-                
+
                 self.checkAndListenToKicked()
             }
     }
@@ -62,7 +61,6 @@ final class ParticipantManager {
     private func checkAndListenToKicked() {
         if isCaptain {
             if kickedListener == nil {
-                AppLogger.managers.info("[ParticipantManager.swift] Started listening for kicked participants")
                 kickedListener = Firestore.firestore()
                     .collection("trips")
                     .document(tripId)
@@ -70,17 +68,15 @@ final class ParticipantManager {
                     .whereField("status", isEqualTo: "kicked")
                     .addSnapshotListener { [weak self] snapshot, error in
                         guard let self = self else { return }
-                        if let error = error {
-                            AppLogger.managers.error("[ParticipantManager.swift] Kicked listener error: \(error.localizedDescription)")
+                        if error != nil {
                             return
                         }
                         guard let documents = snapshot?.documents else { return }
-                        
+
                         self.kickedParticipants = documents.compactMap { doc in
                             do {
                                 return try doc.data(as: Participant.self)
                             } catch {
-                                AppLogger.managers.error("[ParticipantManager.swift] Decode failed for kicked \(doc.documentID): \(error.localizedDescription)")
                                 return nil
                             }
                         }
@@ -102,12 +98,13 @@ final class ParticipantManager {
 
     func canKick(participant: Participant) -> Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
-              let targetId = participant.id,
-              targetId != currentUserId else {
+            let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
+            let targetId = participant.id,
+            targetId != currentUserId
+        else {
             return false
         }
-        
+
         switch currentUserRole {
         case .captain:
             return participant.role != .captain
@@ -118,9 +115,10 @@ final class ParticipantManager {
 
     func canChangeRole(of participant: Participant) -> Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
-              let targetId = participant.id,
-              targetId != currentUserId else {
+            let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role,
+            let targetId = participant.id,
+            targetId != currentUserId
+        else {
             return false
         }
         return currentUserRole.rank > participant.role.rank
@@ -128,14 +126,15 @@ final class ParticipantManager {
 
     func assignableRoles(for participant: Participant) -> [ParticipantRole] {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role else {
+            let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role
+        else {
             return []
         }
-        
+
         if currentUserRole == .captain {
             return [.captain, .passenger, .observer]
         }
-        
+
         return ParticipantRole.allCases.filter { role in
             role.rank < currentUserRole.rank
         }
@@ -143,7 +142,8 @@ final class ParticipantManager {
 
     var isCaptain: Bool {
         guard let currentUserId = Auth.auth().currentUser?.uid,
-              let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role else {
+            let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role
+        else {
             return false
         }
         return currentUserRole == .captain

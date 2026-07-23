@@ -17,7 +17,7 @@ struct TermsOfService: View {
                 termsSection(
                     title: "1. Acceptance of Terms",
                     content: """
-                    By creating an account or using MyJourney, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
+                    By creating an account or using JournPath, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
                     """
                 )
                 
@@ -31,7 +31,7 @@ struct TermsOfService: View {
                 termsSection(
                     title: "3. User Generated Content",
                     content: """
-                    MyJourney allows you to create, save, and manage travel itineraries and notes. You retain all rights to the content you post in the app. However, by posting content, you grant us the right to store and process it using our backend infrastructure (Firebase) strictly to provide the service to you.
+                    JournPath allows you to create, save, and manage travel itineraries and notes. You retain all rights to the content you post in the app. However, by posting content, you grant us the right to store and process it using our backend infrastructure (Firebase) strictly to provide the service to you.
                     """
                 )
                 

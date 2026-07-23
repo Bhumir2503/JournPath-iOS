@@ -17,7 +17,7 @@ struct PrivacyPolicy: View {
                 policySection(
                     title: "1. Information We Collect",
                     content: """
-                    When you use MyJourney, we collect information you provide directly to us. This includes your name, email address, profile picture, and any travel itineraries, dates, or notes you save in the app. \n\nSince we use Firebase for authentication and database services, some basic device and usage data may also be collected automatically to ensure the app functions securely.
+                    When you use JournPath, we collect information you provide directly to us. This includes your name, email address, profile picture, and any travel itineraries, dates, or notes you save in the app. \n\nSince we use Firebase for authentication and database services, some basic device and usage data may also be collected automatically to ensure the app functions securely.
                     """
                 )
                 
@@ -25,7 +25,7 @@ struct PrivacyPolicy: View {
                     title: "2. How We Use Your Information",
                     content: """
                     We use the information we collect to:
-                    • Provide, maintain, and improve the MyJourney app.
+                    • Provide, maintain, and improve the JournPath app.
                     • Authenticate your account securely.
                     • Sync your travel data across your devices.
                     • Send you technical notices or support messages.
@@ -45,14 +45,14 @@ struct PrivacyPolicy: View {
                     We do not sell your personal information. We may share your information only in the following situations:
                     • With your consent.
                     • To comply with legal obligations.
-                    • With third-party service providers (like Google Firebase) strictly to operate the MyJourney service.
+                    • With third-party service providers (like Google Firebase) strictly to operate the JournPath service.
                     """
                 )
                 
                 policySection(
                     title: "5. Your Rights",
                     content: """
-                    You have the right to access, update, or delete your personal information at any time. You can manage your profile data directly within the MyJourney settings or delete your account entirely, which will wipe your trips and data from our active databases.
+                    You have the right to access, update, or delete your personal information at any time. You can manage your profile data directly within the JournPath settings or delete your account entirely, which will wipe your trips and data from our active databases.
                     """
                 )
                 

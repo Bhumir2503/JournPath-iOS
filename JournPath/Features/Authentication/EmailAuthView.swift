@@ -10,7 +10,7 @@ struct EmailAuthView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AuthViewModel.self) private var authVM
-    @Environment(SessionStore.self) private var session
+    @Environment(UserManager.self) private var session
     @FocusState private var focusedField: EmailAuthTextField?
 
     @State private var email: String = ""
@@ -289,6 +289,6 @@ struct RequirementRow: View {
         Color.black.opacity(0.2).ignoresSafeArea()
         EmailAuthView()
             .environment(AuthViewModel())
-            .environment(SessionStore())
+            .environment(UserManager())
     }
 }

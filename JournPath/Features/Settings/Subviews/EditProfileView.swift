@@ -5,10 +5,9 @@ import SwiftUI
 
 struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(SessionStore.self) var session
+    @Environment(UserManager.self) var session
 
     private let authService = AuthService()
-    private let userDB = UserDatabaseService()
     private let userStorage = UserStorageService()
 
     // UI State
@@ -214,6 +213,9 @@ struct EditProfileView: View {
                     do {
                         try await updateProfile()
                         successMessage = "Your profile has been successfully updated."
+                    } catch let error as LocalizedError {
+                        errorMessage = error.recoverySuggestion ?? error.localizedDescription
+                        throw error
                     } catch {
                         errorMessage = error.localizedDescription
                         throw error

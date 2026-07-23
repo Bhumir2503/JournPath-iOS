@@ -19,7 +19,6 @@ struct LodgingFormView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    mapHeader
 
                     VStack(alignment: .leading, spacing: 24) {
                         titleHeader
@@ -75,7 +74,6 @@ struct LodgingFormView: View {
                 DatePickerView(
                     initialStartDate: vm.checkinDate,
                     initialEndDate: vm.checkoutDate,
-                    dateRange: vm.validDateRange(trip: tripManager.currentTrip),
                     onCancel: {
                         showingDatePicker = false
                     },
@@ -106,14 +104,6 @@ struct LodgingFormView: View {
     }
 
     // MARK: - Extracted Views
-
-    @ViewBuilder
-    private var mapHeader: some View {
-        if let coordinate = vm.place.coordinate {
-            StaticMapSnapshotView(coordinate: coordinate, height: 350)
-        }
-    }
-
     @ViewBuilder
     private var titleHeader: some View {
         VStack(alignment: .leading, spacing: 6) {

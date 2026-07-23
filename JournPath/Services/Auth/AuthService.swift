@@ -57,14 +57,8 @@ class AuthService {
     }
 
     // MARK: - Profile Management
-    func updateProfile(payload: [String: Any]) async throws(AuthError) {
-        do {
-            _ = try await Functions.functions()
-                .httpsCallable("updateUserProfile")
-                .call(payload)
-        } catch {
-            throw AuthError(firebaseError: error)
-        }
+    func updateProfile(payload: [String: Any]) async throws(APIError) {
+        try await APIClient.shared.post("/user/update", body: payload)
     }
 
     // MARK: - Account Linking
@@ -124,53 +118,5 @@ class AuthService {
         } catch {
             throw AuthError(firebaseError: error)
         }
-    }
-
-    // MARK: - Account Deletion
-    @MainActor
-    func deleteAccount(email: String? = nil, password: String? = nil) async throws(AuthError) {
-        // guard let user = Auth.auth().currentUser else { throw .notSignedIn }
-
-        // let hasApple = user.providerData.contains { $0.providerID == "apple.com" }
-        // let hasGoogle = user.providerData.contains { $0.providerID == "google.com" }
-
-        // do {
-        //     if let provider = provider {
-        //         if provider == .apple {
-        //             let (credential, authCode) = try await appleAuth.getCredential()
-        //             try await user.reauthenticate(with: credential)
-        //             if let authCode = authCode {
-        //                 try await Auth.auth().revokeToken(withAuthorizationCode: authCode)
-        //             }
-        //         } else if provider == .google {
-        //             let credential = try await googleAuth.getCredential()
-        //             try await user.reauthenticate(with: credential)
-        //         }
-        //     } else if let email = email, let password = password, !email.isEmpty, !password.isEmpty {
-        //         let credential = EmailAuthProvider.credential(withEmail: email, password: password)
-        //         try await user.reauthenticate(with: credential)
-        //     } else if hasApple {
-        //         // Force re-authentication to get a fresh authorization code
-        //         let (credential, authCode) = try await appleAuth.getCredential()
-
-        //         // Re-authenticate to satisfy recent-login requirement for deletion
-        //         try await user.reauthenticate(with: credential)
-
-        //         if let authCode = authCode {
-        //             try await Auth.auth().revokeToken(withAuthorizationCode: authCode)
-        //         }
-        //     } else if hasGoogle {
-        //         let credential = try await googleAuth.getCredential()
-        //         try await user.reauthenticate(with: credential)
-        //     }
-
-        //     // Actually delete the Firebase user.
-        //     // This will trigger any Auth onDelete cloud functions to clean up Firestore/Storage.
-        //     try await user.delete()
-        // } catch let error as AuthError {
-        //     throw error
-        // } catch {
-        //     throw AuthError(firebaseError: error)
-        // }
     }
 }

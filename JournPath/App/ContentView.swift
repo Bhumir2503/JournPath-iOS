@@ -9,9 +9,8 @@ import FirebaseAuth
 import SwiftUI
 
 struct ContentView: View {
-    @State private var session = SessionStore()
+    @State private var session = UserManager()
     @State private var router = AppRouter()
-    @State private var uploadManager = UploadManager()
 
     @AppStorage("lastTripId") var lastTripId: String?
     @AppStorage("pendingTripId") var pendingTripId: String?
@@ -63,7 +62,6 @@ extension ContentView {
             router.restoreLastTripIfNeeded()
         }
         .environment(router)
-        .environment(uploadManager)
     }
 
     @ViewBuilder

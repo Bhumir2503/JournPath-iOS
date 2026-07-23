@@ -2,7 +2,7 @@ import SwiftUI
 import FirebaseAuth
 
 struct SignInMethodLinkingView: View {
-    @Environment(SessionStore.self) private var sessionStore
+    @Environment(UserManager.self) private var sessionStore
     private let authService = AuthService()
 
     @State private var errorMessage: String? = nil
@@ -129,7 +129,7 @@ struct SignInMethodLinkingView: View {
 // MARK: - Link Email View
 struct LinkEmailView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(SessionStore.self) private var sessionStore
+    @Environment(UserManager.self) private var sessionStore
     
     @State private var email = ""
     @State private var password = ""
@@ -307,6 +307,6 @@ struct ProviderRow: View {
 #Preview {
     NavigationStack {
         SignInMethodLinkingView()
-            .environment(SessionStore())
+            .environment(UserManager())
     }
 }

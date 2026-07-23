@@ -4,8 +4,7 @@ import StoreKit
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(SessionStore.self) var session
-    @StateObject private var vm = SettingsViewModel()
+    @Environment(UserManager.self) var session
     @Environment(AppRouter.self) private var router
     @Environment(\.requestReview) var requestReview
 
@@ -136,14 +135,6 @@ extension SettingsView {
                 SignInMethodLinkingView()
             } label: {
                 Label("Linked Sign-In Methods ", systemImage: "person.badge.key")
-            }
-
-            NavigationLink {
-                DeleteAccountView()
-            } label: {
-                HStack {
-                    Label("Delete Account", systemImage: "trash")
-                }
             }
         }
     }
