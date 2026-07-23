@@ -8,19 +8,10 @@ enum DashboardSheet: Identifiable {
     var id: Int { hashValue }
 }
 
-enum DashboardAlert: Identifiable, Hashable {
-    case rename, leave
-    case error(String)
-    case tripDeleted
-    case removed
-    var id: Int { hashValue }
-}
-
 struct TripDashboardView: View {
     let tripId: String
 
     // States
-
     @State private var tripManager: TripManager
 
     // Services
@@ -79,7 +70,7 @@ struct TripDashboardView: View {
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(uiColor: .secondarySystemBackground))
         .alert(
-            alertTitle(for: activeAlert),
+            activeAlert?.title ?? "",
             isPresented: Binding(
                 get: { activeAlert != nil },
                 set: { if !$0 { activeAlert = nil } }
@@ -98,21 +89,14 @@ struct TripDashboardView: View {
                 Button("OK") { router.popToRoot() }
             case .removed:
                 Button("OK") { router.popToRoot() }
+            case .upgraded:
+                Button("OK") {}
             case .error(_):
                 Button("OK", role: .cancel) {}
             }
         } message: { alert in
-            switch alert {
-            case .leave:
-                Text("Are you sure you want to leave this trip?")
-            case .error(let msg):
-                Text(msg)
-            case .tripDeleted:
-                Text("This trip has been deleted and is no longer available.")
-            case .removed:
-                Text("You've been removed from this trip and no longer have access.")
-            default:
-                EmptyView()
+            if let message = alert.message {
+                Text(message)
             }
         }
         .onAppear {
@@ -134,6 +118,11 @@ struct TripDashboardView: View {
                 if activeSheet == .itineraryBuilder {
                     activeSheet = .none
                 }
+            }
+        }
+        .onChange(of: tripManager.currentTrip?.tier) { prev, cur in
+            if prev == .free && cur == .premium {
+                activeAlert = .upgraded
             }
         }
     }
@@ -175,7 +164,7 @@ extension TripDashboardView {
         case .storage:
             StorageHubView(tripId: tripId)
         case .itineraryBuilder:
-            EmptyView()
+            ItineraryBuilderView()
         case .notes:
             EmptyView()
         case .datePicker:
@@ -205,16 +194,6 @@ extension TripDashboardView {
         }
     }
 
-    private func alertTitle(for alert: DashboardAlert?) -> String {
-        switch alert {
-        case .leave: return "Leave Trip?"
-        case .rename: return "Rename Trip"
-        case .tripDeleted: return "Trip Deleted"
-        case .removed: return "Removed From Trip"
-        case .error(_): return "Error"
-        case .none: return ""
-        }
-    }
 }
 
 // MARK: - Actions (Direct Service Calls)
