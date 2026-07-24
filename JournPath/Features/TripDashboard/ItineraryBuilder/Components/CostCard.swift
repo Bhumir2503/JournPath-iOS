@@ -1,45 +1,137 @@
 import Kingfisher
 import SwiftUI
 
-enum SplitType: String, CaseIterable, Identifiable {
+enum SplitType: String, CaseIterable, Identifiable, Codable {
     case evenly = "Evenly"
     case manually = "Manually"
     case percentage = "Percentage"
     var id: String { rawValue }
 }
 
-struct ExpenseGuest: Identifiable, Equatable {
+struct ExpenseGuest: Identifiable, Equatable, Codable {
     let id: String
     var name: String
 }
 
+struct CostInfo: Equatable, Codable {
+    var currencyCode: String = "USD"
+    var isSplitEnabled = false
+    var participantAmounts: [String: Double] = [:]
+    var totalAmount: Double?
+    var splitType: SplitType = .evenly
+    var participantPercentages: [String: Double] = [:]
+    var excludedFromEqualSplit: Set<String> = []
+    var paidByParticipantId: String?
+    var guests: [ExpenseGuest] = []
+    /// Monotonic counter so re-added guests never reuse a default name.
+    var guestNameCounter: Int = 0
+}
+
+// MARK: - Split math (single source of truth for the remainder rule)
+
+/// All split arithmetic happens in integer minor units so client display,
+/// `expenseFields()` serialization, and the Cloud Function's validation
+/// produce bit-identical numbers. Doubles exist only at the display edge.
+enum SplitMath {
+
+    /// Deterministic remainder recipient: the payer absorbs leftover minor
+    /// units; if the payer isn't participating, the first sorted ID does.
+    /// This MUST match the server's derivation rule.
+    static func remainderRecipient(includedIDs: [String], payerId: String?) -> String? {
+        guard !includedIDs.isEmpty else { return nil }
+        if let payerId, includedIDs.contains(payerId) { return payerId }
+        return includedIDs.sorted()[0]
+    }
+
+    /// Equal split in minor units. Returns [id: minorUnits].
+    static func equalShares(totalMinor: Int, includedIDs: [String], payerId: String?) -> [String: Int] {
+        guard !includedIDs.isEmpty, totalMinor > 0 else { return [:] }
+        let n = includedIDs.count
+        let base = totalMinor / n
+        let remainder = totalMinor % n
+        let recipient = remainderRecipient(includedIDs: includedIDs, payerId: payerId)
+
+        var shares: [String: Int] = [:]
+        for id in includedIDs {
+            shares[id] = base + (id == recipient ? remainder : 0)
+        }
+        return shares
+    }
+
+    /// Percentage split in minor units. Percentages arrive as Doubles from
+    /// the UI, are snapped to integer basis points (33.33% -> 3333), and all
+    /// share math is integer. Rounding dust goes to the remainder recipient
+    /// only when the percentages fully account for 100%.
+    static func percentageShares(
+        totalMinor: Int,
+        percentages: [String: Double],
+        orderedIDs: [String],
+        payerId: String?
+    ) -> [String: Int] {
+        guard totalMinor > 0 else { return [:] }
+
+        var basisPoints: [String: Int] = [:]
+        for id in orderedIDs {
+            guard let pct = percentages[id] else { continue }
+            let bp = Int((pct * 100).rounded())
+            guard bp > 0 else { continue }
+            basisPoints[id] = bp
+        }
+        guard !basisPoints.isEmpty else { return [:] }
+
+        var shares: [String: Int] = [:]
+        var assigned = 0
+        for (id, bp) in basisPoints {
+            let share = totalMinor * bp / 10_000  // integer math, truncates
+            shares[id] = share
+            assigned += share
+        }
+
+        // Exact check, no float epsilon: dust is only distributed when the
+        // user has assigned exactly 100%.
+        let totalBp = basisPoints.values.reduce(0, +)
+        if totalBp == 10_000 {
+            let dust = totalMinor - assigned
+            if dust != 0,
+                let recipient = remainderRecipient(includedIDs: Array(basisPoints.keys), payerId: payerId)
+            {
+                shares[recipient, default: 0] += dust
+            }
+        }
+        return shares
+    }
+
+    /// Display-edge conversion. The resulting Double may carry float
+    /// representation error, but it is < half a minor unit, so formatting
+    /// and round-tripping back through `CurrencyInfo.minorUnits` are exact.
+    static func toDisplay(_ minor: Int, fractionDigits: Int) -> Double {
+        Double(minor) / pow(10.0, Double(fractionDigits))
+    }
+}
+
 struct CostCard: View {
     let participantManager: ParticipantManager?
-    @AppStorage var currencyCode: String
+    @Binding var info: CostInfo
 
-    @State private var isSplitEnabled = false
     @State private var showingAmountSheet = false
-    @State private var participantAmounts: [String: Double] = [:]
     @State private var selectedParticipantForAmount: Participant?
     @State private var selectedParticipantForPercentage: Participant?
-    @State private var totalAmount: Double?
-    @State private var splitType: SplitType = .evenly
-    @State private var participantPercentages: [String: Double] = [:]
-    @State private var excludedFromEqualSplit: Set<String> = []
-    @State private var paidByParticipantId: String?
 
-    @State private var guests: [ExpenseGuest] = []
     @State private var selectedGuestForAmount: ExpenseGuest?
     @State private var selectedGuestForPercentage: ExpenseGuest?
 
-    init(participantManager: ParticipantManager?) {
+    init(participantManager: ParticipantManager?, info: Binding<CostInfo>) {
         self.participantManager = participantManager
-        let tripId = participantManager?.tripId ?? "default"
-        self._currencyCode = AppStorage(wrappedValue: "USD", "currencyCode_\(tripId)")
+        self._info = info
     }
 
     private var participants: [Participant] {
         participantManager?.sortedParticipants ?? []
+    }
+
+    /// Stable identity list used to detect async participant loading.
+    private var participantIDs: [String] {
+        participants.compactMap(\.id)
     }
 
     var body: some View {
@@ -49,7 +141,7 @@ struct CostCard: View {
             ActionRowView(
                 icon: "dollarsign.circle.fill",
                 title: "Amount",
-                value: totalAmount.map(formatAmount) ?? "Add amount",
+                value: info.totalAmount.map(formatAmount) ?? "Add amount",
                 showDivider: hasMultipleParticipants
             ) {
                 showingAmountSheet = true
@@ -67,7 +159,7 @@ struct CostCard: View {
                     Spacer()
 
                     Menu {
-                        Picker("Paid by", selection: $paidByParticipantId) {
+                        Picker("Paid by", selection: $info.paidByParticipantId) {
                             ForEach(participants) { participant in
                                 if let id = participant.id {
                                     Text(participant.displayName).tag(String?.some(id))
@@ -76,12 +168,13 @@ struct CostCard: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            if let selectedId = paidByParticipantId,
-                               let participant = participants.first(where: { $0.id == selectedId }) {
+                            if let selectedId = info.paidByParticipantId,
+                                let participant = participants.first(where: { $0.id == selectedId })
+                            {
                                 AvatarView(name: participant.displayName, color: .primary, imageUrl: participant.photoURL)
                                     .scaleEffect(0.6)
                                     .frame(width: 24, height: 24)
-                                
+
                                 Text(participant.displayName)
                             } else {
                                 Text("Select")
@@ -96,7 +189,7 @@ struct CostCard: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                
+
                 Divider().padding(.leading, 16)
 
                 HStack(spacing: 16) {
@@ -104,28 +197,28 @@ struct CostCard: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 24, height: 24)
 
-                    Toggle("Split Expense", isOn: $isSplitEnabled.animation())
+                    Toggle("Split Expense", isOn: $info.isSplitEnabled.animation())
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
 
-                if isSplitEnabled {
+                if info.isSplitEnabled {
                     Divider().padding(.leading, 16)
-                    
+
                     Stepper(value: guestCountBinding, in: 0...10) {
                         HStack(spacing: 16) {
                             Image(systemName: "person.3.fill")
                                 .foregroundStyle(.secondary)
                                 .frame(width: 24, height: 24)
-                            Text("Guests (\(guests.count))")
+                            Text("Guests (\(info.guests.count))")
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
 
                     Divider().padding(.leading, 16)
-                    
-                    Picker("Split Type", selection: $splitType) {
+
+                    Picker("Split Type", selection: $info.splitType) {
                         ForEach(SplitType.allCases) { type in
                             Text(type.rawValue).tag(type)
                         }
@@ -140,26 +233,34 @@ struct CostCard: View {
                         ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
                             participantRow(participant)
 
-                            if index < participants.count - 1 || !guests.isEmpty {
+                            if index < participants.count - 1 || !info.guests.isEmpty {
                                 Divider().padding(.leading, 56)
                             }
                         }
-                        
-                        ForEach(Array(guests.enumerated()), id: \.element.id) { index, guest in
-                            guestRow(for: $guests[index])
 
-                            if index < guests.count - 1 {
+                        ForEach(Array(info.guests.enumerated()), id: \.element.id) { index, guest in
+                            guestRow(for: $info.guests[index])
+
+                            if index < info.guests.count - 1 {
                                 Divider().padding(.leading, 56)
                             }
                         }
 
                         if let footer = splitStatus {
                             Divider().padding(.leading, 16)
-                            HStack {
-                                Text(footer.label)
-                                Spacer()
-                                Text(footer.value)
-                                    .monospacedDigit()
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(footer.label)
+                                    Spacer()
+                                    Text(footer.value)
+                                        .monospacedDigit()
+                                }
+
+                                if let subLabel = footer.subLabel {
+                                    Text(subLabel)
+                                        .font(.caption2)
+                                        .foregroundStyle(.gray)
+                                }
                             }
                             .font(.footnote)
                             .foregroundStyle(footer.isBalanced ? Color.secondary : Color.orange)
@@ -174,60 +275,76 @@ struct CostCard: View {
         .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .sheet(isPresented: $showingAmountSheet) {
-            AmountPicker(amount: $totalAmount, currencyCode: $currencyCode)
+            AmountPicker(amount: $info.totalAmount, currencyCode: $info.currencyCode)
         }
         .sheet(item: $selectedParticipantForAmount) { participant in
             AmountPicker(
                 amount: participantAmountBinding(for: participant),
-                currencyCode: $currencyCode
+                currencyCode: $info.currencyCode,
+                limit: availableAmount(excluding: participant.id)
             )
         }
         .sheet(item: $selectedParticipantForPercentage) { participant in
             PercentagePicker(
-                percentage: participantPercentageBinding(for: participant)
+                percentage: participantPercentageBinding(for: participant),
+                limit: availablePercentage(excluding: participant.id)
             )
         }
         .sheet(item: $selectedGuestForAmount) { guest in
             AmountPicker(
                 amount: guestAmountBinding(for: guest),
-                currencyCode: $currencyCode
+                currencyCode: $info.currencyCode,
+                limit: availableAmount(excluding: guest.id)
             )
         }
         .sheet(item: $selectedGuestForPercentage) { guest in
             PercentagePicker(
-                percentage: guestPercentageBinding(for: guest)
+                percentage: guestPercentageBinding(for: guest),
+                limit: availablePercentage(excluding: guest.id)
             )
         }
-        .onChange(of: isSplitEnabled) { _, enabled in
+        .onChange(of: info.isSplitEnabled) { _, enabled in
             if enabled {
                 recomputeSplit()
             }
         }
-
-        .onChange(of: splitType) { _, _ in
+        .onChange(of: info.splitType) { _, _ in
             recomputeSplit()
         }
-        .onChange(of: totalAmount) { _, _ in
+        .onChange(of: info.totalAmount) { _, _ in
             recomputeSplit()
         }
-        .onChange(of: currencyCode) { _, newCode in
-            // Round existing amounts to the new currency's precision (e.g. -> JPY).
+        .onChange(of: info.currencyCode) { _, newCode in
+            // Snap existing values to the new currency's precision, then
+            // recompute so shares still sum exactly to the total (an EUR
+            // 3-way split rounded per-share to JPY precision would drift).
             let digits = CurrencyInfo.fractionDigits(for: newCode)
-            if let total = totalAmount {
-                totalAmount = total.rounded(toPlaces: digits)
+            if let total = info.totalAmount {
+                info.totalAmount = total.rounded(toPlaces: digits)
             }
-            for (key, value) in participantAmounts {
-                participantAmounts[key] = value.rounded(toPlaces: digits)
+            for (key, value) in info.participantAmounts {
+                info.participantAmounts[key] = value.rounded(toPlaces: digits)
             }
+            recomputeSplit()
+        }
+        .onChange(of: participantIDs) { _, _ in
+            // Participants load async (cold cache, first launch) and can
+            // change while the sheet is open (member added to trip).
+            recomputeSplit()
+        }
+        .onChange(of: info.paidByParticipantId) { _, _ in
+            // The payer is the remainder recipient; a payer change can move
+            // the odd cent, so recompute computed splits.
+            recomputeSplit()
         }
         .onAppear {
-            if paidByParticipantId == nil {
-                paidByParticipantId = participantManager?.selfParticipant?.id
+            if info.paidByParticipantId == nil {
+                info.paidByParticipantId = participantManager?.selfParticipant?.id
             }
         }
         .onChange(of: participantManager?.selfParticipant) { _, newValue in
-            if paidByParticipantId == nil {
-                paidByParticipantId = newValue?.id
+            if info.paidByParticipantId == nil {
+                info.paidByParticipantId = newValue?.id
             }
         }
     }
@@ -236,18 +353,23 @@ struct CostCard: View {
 
     private var guestCountBinding: Binding<Int> {
         Binding(
-            get: { guests.count },
+            get: { info.guests.count },
             set: { newCount in
-                if newCount > guests.count {
-                    for _ in 0..<(newCount - guests.count) {
-                        guests.append(ExpenseGuest(id: UUID().uuidString, name: "Guest \(guests.count + 1)"))
+                if newCount > info.guests.count {
+                    for _ in 0..<(newCount - info.guests.count) {
+                        info.guestNameCounter += 1
+                        info.guests.append(
+                            ExpenseGuest(
+                                id: UUID().uuidString,
+                                name: "Guest \(info.guestNameCounter)"
+                            ))
                     }
-                } else if newCount < guests.count {
-                    for _ in 0..<(guests.count - newCount) {
-                        let removed = guests.removeLast()
-                        participantAmounts.removeValue(forKey: removed.id)
-                        participantPercentages.removeValue(forKey: removed.id)
-                        excludedFromEqualSplit.remove(removed.id)
+                } else if newCount < info.guests.count {
+                    for _ in 0..<(info.guests.count - newCount) {
+                        let removed = info.guests.removeLast()
+                        info.participantAmounts.removeValue(forKey: removed.id)
+                        info.participantPercentages.removeValue(forKey: removed.id)
+                        info.excludedFromEqualSplit.remove(removed.id)
                     }
                 }
                 recomputeSplit()
@@ -257,14 +379,13 @@ struct CostCard: View {
 
     private func participantAmountBinding(for participant: Participant) -> Binding<Double?> {
         Binding(
-            get: { participant.id.flatMap { participantAmounts[$0] } },
+            get: { participant.id.flatMap { info.participantAmounts[$0] } },
             set: { newValue in
                 guard let id = participant.id else { return }
                 if let newValue, newValue > 0 {
-                    participantAmounts[id] = newValue
+                    info.participantAmounts[id] = newValue
                 } else {
-                    // Clearing the sheet removes the entry instead of storing 0.
-                    participantAmounts.removeValue(forKey: id)
+                    info.participantAmounts.removeValue(forKey: id)
                 }
             }
         )
@@ -272,15 +393,15 @@ struct CostCard: View {
 
     private func participantPercentageBinding(for participant: Participant) -> Binding<Double?> {
         Binding(
-            get: { participant.id.flatMap { participantPercentages[$0] } },
+            get: { participant.id.flatMap { info.participantPercentages[$0] } },
             set: { newValue in
                 guard let id = participant.id else { return }
-                if let newValue, newValue >= 0 {
-                    participantPercentages[id] = newValue
+                if let newValue, newValue > 0 {
+                    info.participantPercentages[id] = newValue
                 } else {
-                    participantPercentages.removeValue(forKey: id)
+                    info.participantPercentages.removeValue(forKey: id)
                 }
-                if splitType == .percentage {
+                if info.splitType == .percentage {
                     applyPercentageSplit()
                 }
             }
@@ -289,12 +410,12 @@ struct CostCard: View {
 
     private func guestAmountBinding(for guest: ExpenseGuest) -> Binding<Double?> {
         Binding(
-            get: { participantAmounts[guest.id] },
+            get: { info.participantAmounts[guest.id] },
             set: { newValue in
                 if let newValue, newValue > 0 {
-                    participantAmounts[guest.id] = newValue
+                    info.participantAmounts[guest.id] = newValue
                 } else {
-                    participantAmounts.removeValue(forKey: guest.id)
+                    info.participantAmounts.removeValue(forKey: guest.id)
                 }
             }
         )
@@ -302,14 +423,14 @@ struct CostCard: View {
 
     private func guestPercentageBinding(for guest: ExpenseGuest) -> Binding<Double?> {
         Binding(
-            get: { participantPercentages[guest.id] },
+            get: { info.participantPercentages[guest.id] },
             set: { newValue in
-                if let newValue, newValue >= 0 {
-                    participantPercentages[guest.id] = newValue
+                if let newValue, newValue > 0 {
+                    info.participantPercentages[guest.id] = newValue
                 } else {
-                    participantPercentages.removeValue(forKey: guest.id)
+                    info.participantPercentages.removeValue(forKey: guest.id)
                 }
-                if splitType == .percentage {
+                if info.splitType == .percentage {
                     applyPercentageSplit()
                 }
             }
@@ -318,9 +439,25 @@ struct CostCard: View {
 
     // MARK: - Split logic
 
+    private func availableAmount(excluding id: String?) -> Double? {
+        guard let total = info.totalAmount else { return nil }
+        guard let excludeId = id else { return total }
+        let digits = CurrencyInfo.fractionDigits(for: info.currencyCode)
+        let assignedToOthers = info.participantAmounts.filter { $0.key != excludeId }.values.reduce(0, +)
+        let remaining = (total - assignedToOthers).rounded(toPlaces: digits)
+        return remaining > 0 ? remaining : 0
+    }
+
+    private func availablePercentage(excluding id: String?) -> Double {
+        guard let excludeId = id else { return 100 }
+        let assignedToOthers = info.participantPercentages.filter { $0.key != excludeId }.values.reduce(0, +)
+        let remaining = 100 - assignedToOthers
+        return remaining > 0 ? remaining : 0
+    }
+
     private func recomputeSplit() {
-        guard isSplitEnabled else { return }
-        switch splitType {
+        guard info.isSplitEnabled else { return }
+        switch info.splitType {
         case .evenly:
             applyEqualSplit()
         case .percentage:
@@ -330,83 +467,103 @@ struct CostCard: View {
         }
     }
 
-    private func applyPercentageSplit() {
-        let allIDs = participants.compactMap(\.id) + guests.map(\.id)
-        guard let total = totalAmount, total > 0, !allIDs.isEmpty else { return }
-
-        let digits = CurrencyInfo.fractionDigits(for: currencyCode)
-        var amounts: [String: Double] = [:]
-        
-        var assignedTotal: Double = 0
-        var remainingPercentage: Double = 100
-        
-        for id in allIDs {
-            let pct = participantPercentages[id] ?? 0
-            
-            let share = (total * pct / 100).rounded(toPlaces: digits)
-            amounts[id] = share
-            assignedTotal += share
-            remainingPercentage -= pct
-        }
-
-        if abs(remainingPercentage) < 0.01 {
-            let remainder = (total - assignedTotal).rounded(toPlaces: digits)
-            if remainder != 0, let firstID = allIDs.first {
-                amounts[firstID] = (amounts[firstID] ?? 0) + remainder
-            }
-        }
-
-        participantAmounts = amounts
-    }
-
+    /// Equal split via integer minor-unit math. The remainder cent goes to
+    /// the payer (SplitMath rule), matching serialization and the server.
     private func applyEqualSplit() {
-        let allIDs = participants.compactMap(\.id) + guests.map(\.id)
-        guard let total = totalAmount, total > 0, !allIDs.isEmpty else { return }
+        let allIDs = participantIDs + info.guests.map(\.id)
+        guard let total = info.totalAmount, total > 0, !allIDs.isEmpty else { return }
 
-        let includedIDs = allIDs.filter { !excludedFromEqualSplit.contains($0) }
-        
+        let includedIDs = allIDs.filter { !info.excludedFromEqualSplit.contains($0) }
         guard !includedIDs.isEmpty else {
-            participantAmounts = [:]
+            info.participantAmounts = [:]
             return
         }
 
-        let digits = CurrencyInfo.fractionDigits(for: currencyCode)
-        let count = Double(includedIDs.count)
-        let share = (total / count).rounded(toPlaces: digits)
+        let code = info.currencyCode
+        let digits = CurrencyInfo.fractionDigits(for: code)
+        let totalMinor = CurrencyInfo.minorUnits(total, code: code)
 
-        var amounts: [String: Double] = [:]
-        for id in includedIDs {
-            amounts[id] = share
+        let shares = SplitMath.equalShares(
+            totalMinor: totalMinor,
+            includedIDs: includedIDs,
+            payerId: info.paidByParticipantId
+        )
+
+        info.participantAmounts = shares.mapValues {
+            SplitMath.toDisplay($0, fractionDigits: digits)
         }
+    }
 
-        // Assign the remainder to the first included participant or guest.
-        let remainder = (total - share * count).rounded(toPlaces: digits)
-        if remainder != 0, let firstID = includedIDs.first {
-            amounts[firstID] = (share + remainder).rounded(toPlaces: digits)
+    /// Percentage split via integer basis points. No float epsilon checks;
+    /// "assigned exactly 100%" is the exact integer test totalBp == 10000.
+    private func applyPercentageSplit() {
+        let allIDs = participantIDs + info.guests.map(\.id)
+        guard let total = info.totalAmount, total > 0, !allIDs.isEmpty else { return }
+
+        let code = info.currencyCode
+        let digits = CurrencyInfo.fractionDigits(for: code)
+        let totalMinor = CurrencyInfo.minorUnits(total, code: code)
+
+        let shares = SplitMath.percentageShares(
+            totalMinor: totalMinor,
+            percentages: info.participantPercentages,
+            orderedIDs: allIDs,
+            payerId: info.paidByParticipantId
+        )
+
+        info.participantAmounts = shares.mapValues {
+            SplitMath.toDisplay($0, fractionDigits: digits)
         }
-
-        participantAmounts = amounts
     }
 
     private struct SplitStatus {
         let label: String
         let value: String
+        let subLabel: String?
         let isBalanced: Bool
     }
 
     private var splitStatus: SplitStatus? {
-        guard let total = totalAmount, total > 0 else { return nil }
+        guard let total = info.totalAmount, total > 0 else { return nil }
 
-        let digits = CurrencyInfo.fractionDigits(for: currencyCode)
-        let assigned = participantAmounts.values.reduce(0, +)
-        let remaining = (total - assigned).rounded(toPlaces: digits)
+        // Compare in integer minor units — exact, no float equality risk.
+        let code = info.currencyCode
+        let digits = CurrencyInfo.fractionDigits(for: code)
+        let totalMinor = CurrencyInfo.minorUnits(total, code: code)
+        let assignedMinor = info.participantAmounts.values
+            .map { CurrencyInfo.minorUnits($0, code: code) }
+            .reduce(0, +)
+        let remainingMinor = totalMinor - assignedMinor
 
-        if remaining == 0 {
-            return SplitStatus(label: "Fully assigned", value: formatAmount(assigned), isBalanced: true)
-        } else if remaining > 0 {
-            return SplitStatus(label: "Remaining", value: formatAmount(remaining), isBalanced: false)
+        if remainingMinor == 0 {
+            return SplitStatus(
+                label: "Fully assigned",
+                value: formatAmount(SplitMath.toDisplay(assignedMinor, fractionDigits: digits)),
+                subLabel: nil,
+                isBalanced: true
+            )
+        } else if remainingMinor > 0 {
+            var subLabel: String? = nil
+            if let payerId = info.paidByParticipantId {
+                let name =
+                    participants.first(where: { $0.id == payerId })?.displayName
+                    ?? info.guests.first(where: { $0.id == payerId })?.name
+                    ?? "Payer"
+                subLabel = "Will be applied to \(name) when saved"
+            }
+            return SplitStatus(
+                label: "Remaining",
+                value: formatAmount(SplitMath.toDisplay(remainingMinor, fractionDigits: digits)),
+                subLabel: subLabel,
+                isBalanced: false
+            )
         } else {
-            return SplitStatus(label: "Over by", value: formatAmount(-remaining), isBalanced: false)
+            return SplitStatus(
+                label: "Over by",
+                value: formatAmount(SplitMath.toDisplay(-remainingMinor, fractionDigits: digits)),
+                subLabel: nil,
+                isBalanced: false
+            )
         }
     }
 
@@ -414,20 +571,20 @@ struct CostCard: View {
 
     @ViewBuilder
     private func participantRow(_ participant: Participant) -> some View {
-        let amount = participant.id.flatMap { participantAmounts[$0] }
-        let percentage = participant.id.flatMap { participantPercentages[$0] }
-        let isExcluded = participant.id.flatMap { excludedFromEqualSplit.contains($0) } ?? false
+        let amount = participant.id.flatMap { info.participantAmounts[$0] }
+        let percentage = participant.id.flatMap { info.participantPercentages[$0] }
+        let isExcluded = participant.id.flatMap { info.excludedFromEqualSplit.contains($0) } ?? false
 
         Button {
-            if splitType == .evenly {
+            if info.splitType == .evenly {
                 guard let id = participant.id else { return }
-                if excludedFromEqualSplit.contains(id) {
-                    excludedFromEqualSplit.remove(id)
+                if info.excludedFromEqualSplit.contains(id) {
+                    info.excludedFromEqualSplit.remove(id)
                 } else {
-                    excludedFromEqualSplit.insert(id)
+                    info.excludedFromEqualSplit.insert(id)
                 }
                 applyEqualSplit()
-            } else if splitType == .percentage {
+            } else if info.splitType == .percentage {
                 selectedParticipantForPercentage = participant
             } else {
                 selectedParticipantForAmount = participant
@@ -453,7 +610,7 @@ struct CostCard: View {
 
                 Spacer()
 
-                if splitType == .percentage {
+                if info.splitType == .percentage {
                     if let pct = percentage {
                         Text("\(String(format: "%.0f", pct))%")
                             .font(.caption.weight(.semibold))
@@ -465,12 +622,12 @@ struct CostCard: View {
                     }
                 }
 
-                if splitType == .evenly {
-                    Text(isExcluded ? "Excluded" : formatAmount(amount ?? 0))
+                if info.splitType == .evenly {
+                    Text(isExcluded ? "Excluded" : (amount.map(formatAmount) ?? "—"))
                         .font(.subheadline)
                         .foregroundStyle(isExcluded ? Color(UIColor.tertiaryLabel) : .secondary)
                         .monospacedDigit()
-                    
+
                     Image(systemName: isExcluded ? "circle" : "checkmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(isExcluded ? Color(UIColor.tertiaryLabel) : .blue)
@@ -492,9 +649,9 @@ struct CostCard: View {
     @ViewBuilder
     private func guestRow(for guestBinding: Binding<ExpenseGuest>) -> some View {
         let guest = guestBinding.wrappedValue
-        let amount = participantAmounts[guest.id]
-        let percentage = participantPercentages[guest.id]
-        let isExcluded = excludedFromEqualSplit.contains(guest.id)
+        let amount = info.participantAmounts[guest.id]
+        let percentage = info.participantPercentages[guest.id]
+        let isExcluded = info.excludedFromEqualSplit.contains(guest.id)
 
         HStack(spacing: 12) {
             Image(systemName: "person.fill")
@@ -513,21 +670,21 @@ struct CostCard: View {
             Spacer(minLength: 16)
 
             Button {
-                if splitType == .evenly {
+                if info.splitType == .evenly {
                     if isExcluded {
-                        excludedFromEqualSplit.remove(guest.id)
+                        info.excludedFromEqualSplit.remove(guest.id)
                     } else {
-                        excludedFromEqualSplit.insert(guest.id)
+                        info.excludedFromEqualSplit.insert(guest.id)
                     }
                     applyEqualSplit()
-                } else if splitType == .percentage {
+                } else if info.splitType == .percentage {
                     selectedGuestForPercentage = guest
                 } else {
                     selectedGuestForAmount = guest
                 }
             } label: {
                 HStack(spacing: 12) {
-                    if splitType == .percentage {
+                    if info.splitType == .percentage {
                         if let pct = percentage {
                             Text("\(String(format: "%.0f", pct))%")
                                 .font(.caption.weight(.semibold))
@@ -539,12 +696,12 @@ struct CostCard: View {
                         }
                     }
 
-                    if splitType == .evenly {
-                        Text(isExcluded ? "Excluded" : formatAmount(amount ?? 0))
+                    if info.splitType == .evenly {
+                        Text(isExcluded ? "Excluded" : (amount.map(formatAmount) ?? "—"))
                             .font(.subheadline)
                             .foregroundStyle(isExcluded ? Color(UIColor.tertiaryLabel) : .secondary)
                             .monospacedDigit()
-                        
+
                         Image(systemName: isExcluded ? "circle" : "checkmark.circle.fill")
                             .font(.title3)
                             .foregroundStyle(isExcluded ? Color(UIColor.tertiaryLabel) : .blue)
@@ -567,15 +724,14 @@ struct CostCard: View {
     // MARK: - Formatting
 
     private func formatAmount(_ amount: Double) -> String {
-        CurrencyFormatterCache.formatter(for: currencyCode)
+        CurrencyFormatterCache.formatter(for: info.currencyCode)
             .string(from: NSNumber(value: amount)) ?? ""
     }
 }
 
 // MARK: - Formatter cache
 
-/// NumberFormatter creation is expensive; the original code built a new one for
-/// every row on every render. Cache one per currency code instead.
+/// NumberFormatter creation is expensive; cache one per currency code.
 enum CurrencyFormatterCache {
     private static var cache: [String: NumberFormatter] = [:]
 
@@ -586,7 +742,7 @@ enum CurrencyFormatterCache {
         formatter.numberStyle = .currency
         formatter.currencyCode = code
         formatter.locale = CurrencyInfo.locale(for: code)
-        // Use the currency's real precision (JPY = 0, BHD = 3), not a hardcoded 2.
+        // The currency's real precision (JPY = 0, BHD = 3), not a hardcoded 2.
         let digits = CurrencyInfo.fractionDigits(for: code)
         formatter.maximumFractionDigits = digits
         formatter.minimumFractionDigits = digits

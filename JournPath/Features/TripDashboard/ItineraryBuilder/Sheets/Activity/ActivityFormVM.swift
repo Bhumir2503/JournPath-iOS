@@ -17,9 +17,12 @@ final class ActivityFormVM {
     var startDate: Date
     var endDate: Date
     var isAllDay: Bool = true
+    var title: String = ""
     var note: String = ""
 
     var isAddressCopied: Bool = false
+    
+    var costInfo = CostInfo()
 
     /// The trip's day range expressed as instants in the destination's zone.
     /// Computed in `computeSelectableRange(trip:)` before the pickers render.
@@ -97,6 +100,10 @@ final class ActivityFormVM {
             startDate = Date()
             endDate = startDate.addingTimeInterval(3600)
             return
+        }
+        
+        if let savedCurrency = UserDefaults.standard.string(forKey: "currencyCode_\(trip.id)") {
+            costInfo.currencyCode = savedCurrency
         }
 
         var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
@@ -185,8 +192,9 @@ final class ActivityFormVM {
             trueEnd = placeCalendar.startOfDay(for: trueEnd)
         }
 
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let activityPayload = ActivityPayload(
-            title: place.title,
+            title: cleanTitle.isEmpty ? place.title : cleanTitle,
             category: mapToActivityCategory(mapItem.pointOfInterestCategory),
             location: ActivityLocation(mapItem: mapItem),
             participants: nil
@@ -198,8 +206,8 @@ final class ActivityFormVM {
             type: .activity,
             addedBy: Auth.auth().currentUser?.uid ?? "",
             createdAt: nil,
-            cost: nil,
-            currency: nil,
+            cost: costInfo.totalAmount,
+            currency: costInfo.currencyCode,
             bookingRef: nil,
             notes: note.isEmpty ? nil : note,
             attachments: nil,

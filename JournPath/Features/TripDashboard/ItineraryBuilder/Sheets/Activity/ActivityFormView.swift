@@ -21,9 +21,10 @@ struct ActivityFormView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                titleSection
                 dateAndTimeSection
                 PlaceInfoCard(infoItems: vm.infoItems)
-                CostCard(participantManager: participantManager)
+                CostCard(participantManager: participantManager, info: $vm.costInfo)
                 NotesCard(note: $vm.note)
                 StorageCard()
             }
@@ -31,7 +32,7 @@ struct ActivityFormView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .navigationTitle(vm.place.title)
+        .navigationTitle("New Activity")
         .navigationBarTitleDisplayMode(.inline)
         .interactiveDismissDisabled()
         .toolbar {
@@ -58,6 +59,11 @@ struct ActivityFormView: View {
             if participantManager == nil, let tripId = tripManager.currentTrip?.id {
                 participantManager = ParticipantManager(tripId: tripId)
                 participantManager?.startListening()
+            }
+        }
+        .onChange(of: vm.costInfo.currencyCode) { _, newCode in
+            if let tripId = tripManager.currentTrip?.id {
+                UserDefaults.standard.set(newCode, forKey: "currencyCode_\(tripId)")
             }
         }
         .alert("Couldn't save", isPresented: showingSaveError) {
@@ -89,7 +95,23 @@ struct ActivityFormView: View {
         )
     }
 
-    // MARK: - Date & Time
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var titleSection: some View {
+        VStack(spacing: 0) {
+            TextField(vm.place.title, text: $vm.title)
+                .font(.headline)
+                .padding()
+                .onChange(of: vm.title) { _, newValue in
+                    if newValue.count > 50 {
+                        vm.title = String(newValue.prefix(50))
+                    }
+                }
+        }
+        .background(Color(UIColor.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
 
     @ViewBuilder
     private var dateAndTimeSection: some View {

@@ -3,28 +3,50 @@ import SwiftUI
 struct AmountPicker: View {
     @Binding var amount: Double?
     @Binding var currencyCode: String
+    var limit: Double? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountString: String = ""
     @State private var shakeAttempts: Int = 0
 
-    private static let topCurrencies = ["USD", "EUR", "GBP", "JPY", "INR"]
+    private static let top5Currencies = ["USD", "EUR", "GBP", "JPY", "INR"]
+
+    private static let next25Currencies = [
+        "AUD", "CAD", "CHF", "CNY", "NZD",
+        "MXN", "SGD", "HKD", "NOK", "KRW",
+        "TRY", "RUB", "BRL", "ZAR", "SEK",
+        "THB", "IDR", "VND", "PHP", "AED",
+        "EGP", "ILS", "SAR", "MYR", "COP"
+    ]
+
+    private var effectiveMax: Double {
+        let currencyMax = CurrencyInfo.maxAmount(for: currencyCode)
+        guard let limit else { return currencyMax }
+        return min(limit, currencyMax)
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 Spacer()
 
-                // Amount Display
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(CurrencyInfo.symbol(for: currencyCode))
-                        .font(.system(size: 40, weight: .semibold, design: .rounded))
-                        .foregroundStyle(amountString.isEmpty ? Color(UIColor.tertiaryLabel) : .primary)
-                    Text(formattedAmount)
-                        .font(.system(size: 64, weight: .semibold, design: .rounded))
-                        .foregroundStyle(amountString.isEmpty ? Color(UIColor.tertiaryLabel) : .primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
+                // Amount display
+                VStack(spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(CurrencyInfo.symbol(for: currencyCode))
+                            .font(.system(size: 40, weight: .semibold, design: .rounded))
+                            .foregroundStyle(amountString.isEmpty ? Color(UIColor.tertiaryLabel) : .primary)
+                        Text(formattedAmount)
+                            .font(.system(size: 64, weight: .semibold, design: .rounded))
+                            .foregroundStyle(amountString.isEmpty ? Color(UIColor.tertiaryLabel) : .primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                    }
+                    if let limit {
+                        Text("Max: \(formatLimit(limit))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.horizontal, 24)
                 .modifier(Shake(animatableData: CGFloat(shakeAttempts)))
@@ -36,7 +58,7 @@ struct AmountPicker: View {
                 CustomNumberPad(
                     text: $amountString,
                     maxFractionDigits: CurrencyInfo.fractionDigits(for: currencyCode),
-                    maxAmount: CurrencyInfo.maxAmount(for: currencyCode)
+                    maxAmount: effectiveMax
                 ) {
                     withAnimation(.default) {
                         shakeAttempts += 1
@@ -73,13 +95,13 @@ struct AmountPicker: View {
         }
     }
 
-    // MARK: - Currency Menu
+    // MARK: - Currency menu
 
     private var currencyMenu: some View {
         Menu {
             // Pickers render a native checkmark next to the current selection.
             Picker("Currency", selection: $currencyCode) {
-                ForEach(Self.topCurrencies, id: \.self) { code in
+                ForEach(Self.top5Currencies, id: \.self) { code in
                     Text(CurrencyInfo.menuLabel(for: code)).tag(code)
                 }
             }
@@ -87,7 +109,7 @@ struct AmountPicker: View {
 
             Menu("More…") {
                 Picker("More Currencies", selection: $currencyCode) {
-                    ForEach(CurrencyInfo.otherCurrencies(excluding: Self.topCurrencies), id: \.self) { code in
+                    ForEach(Self.next25Currencies, id: \.self) { code in
                         Text(CurrencyInfo.menuLabel(for: code)).tag(code)
                     }
                 }
@@ -115,41 +137,59 @@ struct AmountPicker: View {
             cleaned.removeLast()
         }
 
-        if cleaned.isEmpty {
-            amount = nil
-        } else if let val = Double(cleaned) {
+        // Zero and empty both mean "no amount" — never store 0.0, which
+        // would render as a formatted zero while failing `total > 0` guards.
+        if let val = Double(cleaned), val > 0 {
             amount = val
+        } else {
+            amount = nil
         }
         dismiss()
     }
 
-    /// Re-validates the typed amount when the currency changes:
-    /// truncates decimals the new currency doesn't support and clamps to its max.
+    /// Re-validates the typed amount when the currency changes: truncates
+    /// decimals the new currency doesn't support and clamps to its max.
+    /// Never wipes the user's entry — clamping preserves intent.
     private func sanitizeAmount(for code: String) {
         guard !amountString.isEmpty else { return }
 
         let digits = CurrencyInfo.fractionDigits(for: code)
+        var changed = false
 
         if let dotIndex = amountString.firstIndex(of: ".") {
             if digits == 0 {
                 amountString = String(amountString[..<dotIndex])
+                changed = true
             } else {
                 let fractionStart = amountString.index(after: dotIndex)
                 let fraction = amountString[fractionStart...]
                 if fraction.count > digits {
                     let keepEnd = amountString.index(fractionStart, offsetBy: digits)
                     amountString = String(amountString[..<keepEnd])
+                    changed = true
                 }
             }
         }
 
-        if let val = Double(amountString), val > CurrencyInfo.maxAmount(for: code) {
-            amountString = ""
+        let maximum = limit.map { min($0, CurrencyInfo.maxAmount(for: code)) }
+            ?? CurrencyInfo.maxAmount(for: code)
+        if let val = Double(amountString), val > maximum {
+            amountString = CurrencyInfo.editingString(for: maximum, currencyCode: code)
+            changed = true
+        }
+
+        // One shake for any silent value change so it never goes unnoticed.
+        if changed {
             withAnimation(.default) { shakeAttempts += 1 }
         }
     }
 
     // MARK: - Formatting
+
+    private func formatLimit(_ limit: Double) -> String {
+        CurrencyFormatterCache.formatter(for: currencyCode)
+            .string(from: NSNumber(value: limit)) ?? ""
+    }
 
     private var formattedAmount: String {
         let value = amountString.isEmpty ? "0" : amountString
@@ -172,40 +212,76 @@ struct AmountPicker: View {
     }
 }
 
-// MARK: - Currency Info (cached lookups)
+// MARK: - Currency info (cached lookups)
 
-/// All currency metadata is computed once and cached. The original code iterated
-/// every `Locale.availableIdentifiers` (~1000 locales) on every access — and did
-/// so for every row of the "More…" menu, which made opening it visibly slow.
+/// All currency metadata is computed once and cached. Iterating
+/// `Locale.availableIdentifiers` (~1000 locales) happens exactly once,
+/// lazily, on first access.
 enum CurrencyInfo {
 
+    // MARK: Fraction digits / minor units
+
+    /// ISO 4217 exponent exceptions. Everything absent defaults to 2.
+    /// This is an explicit table — not derived from NumberFormatter — so the
+    /// value is deterministic across OS versions and thread-safe by
+    /// construction. It feeds every minor-unit conversion in the app, so it
+    /// must be provably right. Covered by CurrencyInfoTests.
+    private static let exponentExceptions: [String: Int] = [
+        // Zero-decimal currencies
+        "BIF": 0, "CLP": 0, "DJF": 0, "GNF": 0, "ISK": 0, "JPY": 0,
+        "KMF": 0, "KRW": 0, "PYG": 0, "RWF": 0, "UGX": 0, "UYI": 0,
+        "VND": 0, "VUV": 0, "XAF": 0, "XOF": 0, "XPF": 0,
+        // Three-decimal currencies
+        "BHD": 3, "IQD": 3, "JOD": 3, "KWD": 3, "LYD": 3, "OMR": 3, "TND": 3,
+    ]
+
+    /// Correct decimal places per currency: JPY/KRW = 0, BHD/KWD = 3, most = 2.
+    static func fractionDigits(for code: String) -> Int {
+        exponentExceptions[code.uppercased()] ?? 2
+    }
+
+    /// Converts a user-entered Double into integer minor units, safely.
+    /// `.rounded()` absorbs Double representation artifacts
+    /// (200.20999999… becomes exactly 20021). This is the single conversion
+    /// used by CostCard's SplitMath, expenseFields(), and splitStatus — one
+    /// definition so all three layers agree bit-for-bit.
+    static func minorUnits(_ amount: Double, code: String) -> Int {
+        let factor = pow(10.0, Double(fractionDigits(for: code)))
+        return Int((amount * factor).rounded())
+    }
+
+    // MARK: Locale / symbol table
+
     /// One pass over all locales, done lazily on first access.
-    /// Maps currency code -> (best locale, shortest symbol).
+    /// Maps currency code -> (best formatting locale, shortest symbol).
     private static let table: [String: (locale: Locale, symbol: String)] = {
         var result: [String: (locale: Locale, symbol: String)] = [:]
-        
-        // 1. Curated list of safe locales to guarantee standard, flawless formatting.
-        // For example, en_IE formats EUR exactly like USD but with € (e.g. €1,000,000.00).
-        // en_IN flawlessly handles the Indian Rupee grouping (e.g. ₹10,00,000).
+
+        // 1. Curated locales for the currencies users will actually pick,
+        // guaranteeing standard formatting. en_IE formats EUR like USD but
+        // with € (€1,000,000.00); en_IN handles Indian grouping (₹10,00,000);
+        // ja_JP is the canonical JPY locale (¥, no decimals, correct grouping).
         let preferredLocales: [String: String] = [
-            "USD": "en_US", "EUR": "en_IE", "GBP": "en_GB", "JPY": "en_JP",
+            "USD": "en_US", "EUR": "en_IE", "GBP": "en_GB", "JPY": "ja_JP",
             "INR": "en_IN", "AUD": "en_AU", "CAD": "en_CA", "CHF": "en_CH",
-            "CNY": "en_CN", "NZD": "en_NZ", "MXN": "es_MX", "SGD": "en_SG",
-            "HKD": "en_HK", "NOK": "en_NO", "KRW": "en_KR", "TRY": "en_TR",
-            "RUB": "en_RU", "BRL": "pt_BR", "ZAR": "en_ZA", "SEK": "en_SE",
-            "THB": "th_TH", "IDR": "en_ID", "VND": "vi_VN", "PHP": "en_PH",
-            "AED": "en_AE", "EGP": "en_EG", "ILS": "en_IL", "SAR": "en_SA",
-            "MYR": "en_MY", "COP": "es_CO", "ARS": "es_AR", "CLP": "es_CL"
+            "CNY": "zh_CN", "NZD": "en_NZ", "MXN": "es_MX", "SGD": "en_SG",
+            "HKD": "en_HK", "NOK": "nb_NO", "KRW": "ko_KR", "TRY": "tr_TR",
+            "RUB": "ru_RU", "BRL": "pt_BR", "ZAR": "en_ZA", "SEK": "sv_SE",
+            "THB": "th_TH", "IDR": "id_ID", "VND": "vi_VN", "PHP": "en_PH",
+            "AED": "en_AE", "EGP": "ar_EG", "ILS": "he_IL", "SAR": "ar_SA",
+            "MYR": "ms_MY", "COP": "es_CO", "ARS": "es_AR", "CLP": "es_CL"
         ]
-        
+
         for (code, id) in preferredLocales {
             let locale = Locale(identifier: id)
             if let symbol = locale.currencySymbol {
                 result[code] = (locale, symbol)
             }
         }
-        
-        // 2. Second pass: fill in gaps, and borrow shorter symbols where available.
+
+        // 2. Fill gaps for uncurated currencies (first locale found wins) and
+        // borrow shorter symbols for curated ones while keeping their
+        // formatting locale.
         for identifier in Locale.availableIdentifiers {
             let locale = Locale(identifier: identifier)
 
@@ -219,22 +295,15 @@ enum CurrencyInfo {
             guard let code, let symbol = locale.currencySymbol else { continue }
 
             if let existing = result[code] {
-                // If we find a tighter/shorter symbol, keep our solid formatting locale 
-                // but just steal the shorter symbol!
                 if symbol.count < existing.symbol.count {
                     result[code] = (existing.locale, symbol)
                 }
             } else {
-                // For totally unknown currencies, try to prefer an English-based locale.
-                if result[code] == nil || identifier.hasPrefix("en_") {
-                    result[code] = (locale, symbol)
-                }
+                result[code] = (locale, symbol)
             }
         }
         return result
     }()
-
-    private static var fractionDigitsCache: [String: Int] = [:]
 
     static func locale(for code: String) -> Locale {
         table[code]?.locale ?? .current
@@ -250,20 +319,9 @@ enum CurrencyInfo {
         return formatter.currencySymbol ?? code
     }
 
-    /// Correct decimal places per currency: JPY/KRW = 0, BHD/KWD = 3, most = 2.
-    static func fractionDigits(for code: String) -> Int {
-        if let cached = fractionDigitsCache[code] { return cached }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = code
-        let digits = formatter.maximumFractionDigits
-        fractionDigitsCache[code] = digits
-        return digits
-    }
-
     /// Per-currency entry cap. Zero-decimal currencies (JPY, KRW, VND…) are
-    /// low-denomination, so a flat 1,000,000 cap would be far too restrictive
-    /// there — give them much more headroom (e.g. 99 billion VND is ~$4M USD).
+    /// low-denomination, so a flat cap would be far too restrictive there —
+    /// give them much more headroom (99 billion VND is ~$4M USD).
     static func maxAmount(for code: String) -> Double {
         fractionDigits(for: code) == 0 ? 99_999_999_999 : 99_999_999
     }
@@ -291,7 +349,6 @@ enum CurrencyInfo {
         }
         let digits = max(fractionDigits(for: currencyCode), 1)
         var s = String(format: "%.\(digits)f", amount)
-        // Trim trailing zeros but keep at least one decimal digit's worth of intent.
         while s.hasSuffix("0") { s.removeLast() }
         if s.hasSuffix(".") { s.removeLast() }
         return s
