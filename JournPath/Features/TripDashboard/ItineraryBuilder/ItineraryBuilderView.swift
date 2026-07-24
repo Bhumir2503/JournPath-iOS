@@ -3,9 +3,10 @@ import SwiftUI
 
 struct ItineraryBuilderView: View {
     @State private var vm = ItineraryBuilderVM()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $vm.navigationPath) {
             Group {
                 if !vm.searchTokens.isEmpty || !vm.searchQuery.isEmpty {
                     if vm.isSearching {
@@ -22,8 +23,25 @@ struct ItineraryBuilderView: View {
             }
             .navigationTitle("New Activity")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.down")
+                    }
+                }
+            }
             .safeAreaInset(edge: .top) {
                 locationPickerHeader
+            }
+            .navigationDestination(for: FormDestination.self) { destination in
+                switch destination {
+                case .activity(let place):
+                    ActivityFormView(place: place) {
+                        dismiss()
+                    }
+                }
             }
         }
         .searchable(
@@ -41,18 +59,9 @@ struct ItineraryBuilderView: View {
                 }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-            case .activity(let place):
-                ActivityFormView(place: place)
-            case .stay(let place):
-                LodgingFormView(place: place)
-            case .transit:
-                EmptyView()
-            case .flight:
-                EmptyView()
-            case .custom:
-                EmptyView()
             }
         }
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: - Location Header
@@ -230,6 +239,9 @@ struct SearchResultRow: View {
                 }
             }
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
         .padding(.vertical, 4)
     }

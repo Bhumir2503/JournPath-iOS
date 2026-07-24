@@ -35,7 +35,7 @@ let categoryGroups: [POICategoryGroup] = [
             POICategory(name: "Restaurants", icon: "fork.knife", color: .orange, type: .activity, poiFilters: [.restaurant]),
             POICategory(name: "Parks", icon: "tree.fill", color: .green, type: .activity, poiFilters: [.nationalPark, .park]),
             POICategory(name: "Landmarks", icon: "camera.fill", color: .purple, type: .activity, poiFilters: [.landmark]),
-            POICategory(name: "Hotels", icon: "bed.double.fill", color: .mint, type: .lodging, poiFilters: [.hotel]),
+            // POICategory(name: "Hotels", icon: "bed.double.fill", color: .mint, type: .lodging, poiFilters: [.hotel]),
         ]),
 
     POICategoryGroup(
@@ -71,8 +71,8 @@ let categoryGroups: [POICategoryGroup] = [
         items: [
             POICategory(name: "National Park", icon: "tree.fill", color: .green, type: .activity, poiFilters: [.nationalPark, .park]),
             POICategory(name: "Beach", icon: "beach.umbrella.fill", color: .green, type: .activity, poiFilters: [.beach]),
-            POICategory(name: "Campground", icon: "tent.fill", color: .green, type: .lodging, poiFilters: [.campground]),
-            POICategory(name: "RV Park", icon: "car.fill", color: .green, type: .lodging, poiFilters: [.rvPark]),
+            // POICategory(name: "Campground", icon: "tent.fill", color: .green, type: .lodging, poiFilters: [.campground]),
+            // POICategory(name: "RV Park", icon: "car.fill", color: .green, type: .lodging, poiFilters: [.rvPark]),
             POICategory(name: "Amusement Park", icon: "ticket.fill", color: .green, type: .activity, poiFilters: [.amusementPark]),
             POICategory(name: "Zoo", icon: "tortoise.fill", color: .green, type: .activity, poiFilters: [.zoo]),
             POICategory(name: "Aquarium", icon: "fish.fill", color: .green, type: .activity, poiFilters: [.aquarium]),

@@ -1,27 +1,15 @@
-// MARK: - Search Coordinator
 import CoreLocation
 import Foundation
 import MapKit
 import SwiftUI
 
-enum ActivitySheet: Identifiable {
+enum ActivitySheet: String, Identifiable {
     case myCurrentLocation
-    case activity(PlaceResult)
-    case stay(PlaceResult)
-    case transit(PlaceResult)
-    case flight(PlaceResult)
-    case custom
+    var id: String { rawValue }
+}
 
-    var id: String {
-        switch self {
-        case .myCurrentLocation: return "myCurrentLocation"
-        case .activity(let place): return "activity-\(place.id)"
-        case .stay(let place): return "stay-\(place.id)"
-        case .transit(let place): return "transit-\(place.id)"
-        case .flight(let place): return "flight-\(place.id)"
-        case .custom: return "custom"
-        }
-    }
+enum FormDestination: Hashable {
+    case activity(PlaceResult)
 }
 
 enum LocationIndicatorStatus: Equatable {
@@ -54,9 +42,9 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
     var searchResults: [PlaceResult] = []
     var isSearching = false
     var hasCompletedSearch = false
-    var showError = false
 
-    var activeSheet: ActivitySheet? = nil
+    var activeSheet: ActivitySheet?
+    var navigationPath: [FormDestination] = []
 
     // MARK: - Location State
 
@@ -64,22 +52,18 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
         didSet {
             saveCustomLocation()
             updateLocationIndicator()
-
-            if !searchQuery.isEmpty {
-                performTextSearch(query: searchQuery)
-            } else if let category = searchTokens.first {
-                performCategorySearch(category: category)
-            }
+            rerunActiveSearch()
         }
     }
 
     var locationIndicatorStatus: LocationIndicatorStatus = .requesting
 
-    // MARK: - Private Properties
+    // MARK: - Private
 
     private let locationManager = CLLocationManager()
     private var userLocation: CLLocationCoordinate2D?
-    private var debounceTask: Task<Void, Never>? = nil
+    private var debounceTask: Task<Void, Never>?
+    private var searchTask: Task<Void, Never>?
     private var isProgrammaticUpdate = false
 
     // MARK: - Init
@@ -90,16 +74,14 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
         loadCustomLocation()
     }
 
-    // MARK: - Setup
-
     private func setupLocationManager() {
         locationManager.delegate = self
         if locationManager.authorizationStatus == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
         } else {
             updateLocationIndicator()
+            locationManager.startUpdatingLocation()
         }
-        locationManager.startUpdatingLocation()
     }
 
     // MARK: - Reactive Handlers
@@ -109,9 +91,10 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
 
         debounceTask?.cancel()
         hasCompletedSearch = false
-        debounceTask = Task {
+
+        debounceTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let self else { return }
 
             if query.isEmpty {
                 if let category = self.searchTokens.first {
@@ -129,13 +112,19 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
         guard !isProgrammaticUpdate else { return }
         hasCompletedSearch = false
 
-        if tokens.isEmpty {
-            if searchQuery.isEmpty {
-                searchResults = []
-            } else {
-                performTextSearch(query: searchQuery)
-            }
-        } else if let category = tokens.first {
+        if let category = tokens.first {
+            performCategorySearch(category: category)
+        } else if searchQuery.isEmpty {
+            searchResults = []
+        } else {
+            performTextSearch(query: searchQuery)
+        }
+    }
+
+    private func rerunActiveSearch() {
+        if !searchQuery.isEmpty {
+            performTextSearch(query: searchQuery)
+        } else if let category = searchTokens.first {
             performCategorySearch(category: category)
         }
     }
@@ -144,44 +133,23 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
 
     func handleCategoryTap(category: POICategory) {
         isProgrammaticUpdate = true
-        self.searchTokens = [category]
-        self.searchQuery = ""
+        searchTokens = [category]
+        searchQuery = ""
         isProgrammaticUpdate = false
-        hasCompletedSearch = false
 
+        hasCompletedSearch = false
         performCategorySearch(category: category)
     }
 
+    /// Resolves the place's timezone, then navigates. Resolution happens
+    /// before the form appears so its date pickers are pinned correctly.
     func routeResolvedItem(_ resolved: PlaceResult) {
-        Task {
-            var place = resolved
-            place.timeZone = await resolveTimeZone(for: resolved)
-
-            let type = searchTokens.first?.type ?? .activity
-            switch type {
-            case .lodging: activeSheet = .stay(place)
-            case .transit: activeSheet = .transit(place)
-            case .flight: activeSheet = .flight(place)
-            default: activeSheet = .activity(place)
-            }
-        }
-    }
-
-    private func resolveTimeZone(for place: PlaceResult) async -> TimeZone? {
-        if let tz = place.mapItem?.timeZone { return tz }
-        guard let coordinate = place.coordinate else { return nil }
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
-            return placemark.timeZone
-        }
-        return nil
+        navigationPath.append(.activity(resolved))
     }
 
     // MARK: - Search
 
     private func performTextSearch(query: String) {
-        self.isSearching = true
-        self.hasCompletedSearch = false
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         request.resultTypes = .pointOfInterest
@@ -190,39 +158,23 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
             request.pointOfInterestFilter = MKPointOfInterestFilter(including: category.poiFilters)
         }
 
-        if let coordinate = searchNearLocation?.coordinate ?? userLocation {
-            request.region = MKCoordinateRegion(
-                center: coordinate,
-                latitudinalMeters: 50_000,
-                longitudinalMeters: 50_000
-            )
-        }
-
-        Task {
-            do {
-                let response = try await MKLocalSearch(request: request).start()
-                self.searchResults = response.mapItems.map {
-                    PlaceResult(
-                        title: $0.name ?? "Unknown",
-                        subtitle: $0.address?.fullAddress ?? "",
-                        coordinate: $0.location.coordinate,
-                        mapItem: $0
-                    )
-                }
-            } catch {
-                self.searchResults = []
-            }
-            self.isSearching = false
-            self.hasCompletedSearch = true
-        }
+        run(request)
     }
 
     private func performCategorySearch(category: POICategory) {
-        self.isSearching = true
-        self.hasCompletedSearch = false
         let request = MKLocalSearch.Request()
         request.resultTypes = .pointOfInterest
 
+        if category.poiFilters.isEmpty {
+            request.naturalLanguageQuery = category.name
+        } else {
+            request.pointOfInterestFilter = MKPointOfInterestFilter(including: category.poiFilters)
+        }
+
+        run(request)
+    }
+
+    private func run(_ request: MKLocalSearch.Request) {
         if let coordinate = searchNearLocation?.coordinate ?? userLocation {
             request.region = MKCoordinateRegion(
                 center: coordinate,
@@ -231,26 +183,29 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
             )
         }
 
-        request.pointOfInterestFilter =
-            category.poiFilters.isEmpty
-            ? nil
-            : MKPointOfInterestFilter(including: category.poiFilters)
-        if category.poiFilters.isEmpty { request.naturalLanguageQuery = category.name }
+        searchTask?.cancel()
+        isSearching = true
+        hasCompletedSearch = false
 
-        Task {
+        searchTask = Task { [weak self] in
+            let results: [PlaceResult]
             do {
                 let response = try await MKLocalSearch(request: request).start()
-                self.searchResults = response.mapItems.map {
+                results = response.mapItems.map { item in
                     PlaceResult(
-                        title: $0.name ?? "Unknown",
-                        subtitle: $0.address?.fullAddress ?? "",
-                        coordinate: $0.location.coordinate,
-                        mapItem: $0
+                        title: item.name ?? "Unknown",
+                        subtitle: item.address?.fullAddress ?? "",
+                        coordinate: item.location.coordinate,
+                        mapItem: item,
+                        timeZone: item.timeZone
                     )
                 }
             } catch {
-                self.searchResults = []
+                results = []
             }
+
+            guard !Task.isCancelled, let self else { return }
+            self.searchResults = results
             self.isSearching = false
             self.hasCompletedSearch = true
         }
@@ -261,29 +216,24 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
     private func updateLocationIndicator() {
         if let location = searchNearLocation {
             locationIndicatorStatus = .custom(location.name)
-        } else if locationManager.authorizationStatus == .denied
-            || locationManager.authorizationStatus == .restricted
-        {
-            locationIndicatorStatus = .permissionDenied
-        } else if locationManager.authorizationStatus == .notDetermined {
-            locationIndicatorStatus = .requesting
         } else {
-            locationIndicatorStatus = .usingCurrent
+            switch locationManager.authorizationStatus {
+            case .denied, .restricted: locationIndicatorStatus = .permissionDenied
+            case .notDetermined: locationIndicatorStatus = .requesting
+            default: locationIndicatorStatus = .usingCurrent
+            }
         }
     }
 
     private func loadCustomLocation() {
-        if let data = UserDefaults.standard.data(forKey: "searchNearLocationData"),
+        guard let data = UserDefaults.standard.data(forKey: "searchNearLocationData"),
             let location = try? JSONDecoder().decode(SearchNearLocation.self, from: data)
-        {
-            self.searchNearLocation = location
-        }
+        else { return }
+        searchNearLocation = location
     }
 
     private func saveCustomLocation() {
-        if let location = searchNearLocation,
-            let data = try? JSONEncoder().encode(location)
-        {
+        if let location = searchNearLocation, let data = try? JSONEncoder().encode(location) {
             UserDefaults.standard.set(data, forKey: "searchNearLocationData")
         } else {
             UserDefaults.standard.removeObject(forKey: "searchNearLocationData")
@@ -293,21 +243,20 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
     // MARK: - CLLocationManagerDelegate
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        Task { @MainActor in
-            self.updateLocationIndicator()
-            if manager.authorizationStatus == .authorizedWhenInUse
-                || manager.authorizationStatus == .authorizedAlways
-            {
-                manager.startUpdatingLocation()
+        let status = manager.authorizationStatus
+        Task { @MainActor [weak self] in
+            self?.updateLocationIndicator()
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                self?.locationManager.startUpdatingLocation()
             }
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        Task { @MainActor in
-            self.userLocation = location.coordinate
-            manager.stopUpdatingLocation()
+        guard let coordinate = locations.last?.coordinate else { return }
+        Task { @MainActor [weak self] in
+            self?.userLocation = coordinate
+            self?.locationManager.stopUpdatingLocation()
         }
     }
 }

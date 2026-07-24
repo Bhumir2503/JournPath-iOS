@@ -1,21 +1,21 @@
-import Combine
+import FirebaseFirestore
 import Foundation
 import SwiftUI
 
 @Observable
-final class ItineraryManager {
+class ItineraryManager {
+
     // MARK: - State
+
     var items: [ItineraryItem] = []
-    var isLoading: Bool = true
-    var errorMessage: String? = nil
+    var isLoading = true
+    var error: String?
 
     // MARK: - Dependencies
+
     private let tripId: String
-    @ObservationIgnored private let itineraryService = ItineraryService()
+    private var listener: ListenerRegistration?
 
-    private var cancelListener: (() -> Void)?
-
-    // MARK: - Initialization
     init(tripId: String) {
         self.tripId = tripId
     }
@@ -24,30 +24,56 @@ final class ItineraryManager {
         stopListening()
     }
 
-    // MARK: - Lifecycle Management
+    // MARK: - Lifecycle
+
     func startListening() {
-        guard !tripId.isEmpty else { return }
-        guard cancelListener == nil else { return }
+        guard listener == nil else { return }
+        isLoading = true
 
-        AppLogger.managers.info("[ItineraryManager.swift] Started listening to itinerary for trip: \(tripId)")
+        AppLogger.managers.info("[ItineraryManager] Listening for items in trip: \(tripId)")
 
-        cancelListener = itineraryService.listenToItinerary(tripId: tripId) { [weak self] items, error in
-            self?.isLoading = false
-            if let error = error {
-                self?.errorMessage = "Failed to load itinerary."
-                AppLogger.database.error("[ItineraryManager.swift] Error fetching itinerary: \(error)")
-            } else {
-                self?.items = items ?? []
-                self?.errorMessage = nil
+        listener = Firestore.firestore()
+            .collection("trips")
+            .document(tripId)
+            .collection("itineraryItems")
+            .order(by: "startTime")
+            .addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor in
+                    self?.handle(snapshot: snapshot, error: error)
+                }
             }
-        }
     }
 
     func stopListening() {
-        if cancelListener != nil {
-            AppLogger.managers.info("[ItineraryManager.swift] Stopped listening to itinerary for trip: \(tripId)")
-            cancelListener?()
-            cancelListener = nil
+        listener?.remove()
+        listener = nil
+    }
+
+    // MARK: - Snapshot Handling
+
+    private func handle(snapshot: QuerySnapshot?, error: Error?) {
+        isLoading = false
+
+        if let error {
+            self.error = error.localizedDescription
+            AppLogger.managers.error("[ItineraryManager] Listener error: \(error.localizedDescription)")
+            return
         }
+
+        guard let documents = snapshot?.documents else {
+            items = []
+            return
+        }
+
+        items = documents.compactMap { document in
+            do {
+                return try document.data(as: ItineraryItem.self)
+            } catch {
+                AppLogger.managers.error(
+                    "[ItineraryManager] Failed to decode \(document.documentID): \(error)")
+                return nil
+            }
+        }
+        self.error = nil
     }
 }

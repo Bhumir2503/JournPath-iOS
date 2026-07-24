@@ -1,4 +1,3 @@
-import Combine
 import FirebaseAuth
 import Foundation
 import MapKit
@@ -18,19 +17,17 @@ final class ActivityFormVM {
     var startDate: Date
     var endDate: Date
     var isAllDay: Bool = true
-    var note: String = "" {
-        didSet {
-            if note.count > 500 {
-                note = String(note.prefix(500))
-            }
-        }
-    }
+    var note: String = ""
 
     var isAddressCopied: Bool = false
 
     /// The trip's day range expressed as instants in the destination's zone.
-    /// Recomputed in `computeSelectableRange(trip:)` before the pickers render.
+    /// Computed in `computeSelectableRange(trip:)` before the pickers render.
     private(set) var selectableRange: ClosedRange<Date> = Date.distantPast...Date.distantFuture
+
+    /// Guards against `.onAppear` re-running setup and wiping user edits when
+    /// the view reappears after a push/pop.
+    private var hasSetupDates = false
 
     // MARK: - Timezone
 
@@ -73,11 +70,13 @@ final class ActivityFormVM {
     func computeSelectableRange(trip: Trip?) {
         guard let trip else { return }
 
-        var startComps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
+        var startComps = Calendar.tripDates.dateComponents(
+            [.year, .month, .day], from: trip.startDate)
         startComps.hour = 0
         startComps.minute = 0
 
-        var endComps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.endDate)
+        var endComps = Calendar.tripDates.dateComponents(
+            [.year, .month, .day], from: trip.endDate)
         endComps.hour = 23
         endComps.minute = 59
 
@@ -89,7 +88,11 @@ final class ActivityFormVM {
     }
 
     /// Defaults to 10:00 AM on the trip's first day, in the destination's zone.
+    /// Runs once — re-entry is a no-op so user edits survive view reappearance.
     func setupDates(trip: Trip?) {
+        guard !hasSetupDates else { return }
+        hasSetupDates = true
+
         guard let trip else {
             startDate = Date()
             endDate = startDate.addingTimeInterval(3600)
@@ -135,7 +138,9 @@ final class ActivityFormVM {
             startDate = clampToRange(placeCalendar.startOfDay(for: startDate))
             endDate = clampToRange(placeCalendar.startOfDay(for: endDate))
         } else {
-            let start = placeCalendar.date(bySettingHour: 10, minute: 0, second: 0, of: startDate) ?? startDate
+            let start =
+                placeCalendar.date(
+                    bySettingHour: 10, minute: 0, second: 0, of: startDate) ?? startDate
             startDate = clampToRange(start)
             endDate = clampToRange(startDate.addingTimeInterval(3600))
         }
@@ -184,9 +189,6 @@ final class ActivityFormVM {
             title: place.title,
             category: mapToActivityCategory(mapItem.pointOfInterestCategory),
             location: ActivityLocation(mapItem: mapItem),
-            start: LocalDateTime(instant: trueStart, timeZoneId: tzId),
-            end: LocalDateTime(instant: trueEnd, timeZoneId: tzId),
-            allDay: isAllDay,
             participants: nil
         )
 
@@ -204,10 +206,8 @@ final class ActivityFormVM {
             startTime: trueStart,
             endTime: trueEnd,
             timeZoneId: tzId,
-            activity: activityPayload,
-            flight: nil,
-            stay: nil,
-            transit: nil
+            allDay: isAllDay,
+            activity: activityPayload
         )
 
         try await service.saveItem(newActivity)
@@ -230,7 +230,10 @@ final class ActivityFormVM {
 
     var infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] {
         var items: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] = []
-        let addressText = place.subtitle.isEmpty ? "Location Coordinates Available" : place.subtitle
+        let addressText =
+            place.subtitle.isEmpty
+            ? "Location Coordinates Available"
+            : place.subtitle
 
         items.append(
             (
