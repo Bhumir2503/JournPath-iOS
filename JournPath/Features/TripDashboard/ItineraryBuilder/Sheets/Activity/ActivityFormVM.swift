@@ -17,7 +17,7 @@ final class ActivityFormVM {
     var item: ItineraryItem
     var isAddressCopied: Bool = false
 
-    var expense = Expense()
+    var costInfo = CostInfo()
 
     /// The trip's day range expressed as instants in the destination's zone.
     /// Computed in `computeSelectableRange(trip:)` before the pickers render.
@@ -113,7 +113,7 @@ final class ActivityFormVM {
         }
 
         if let savedCurrency = UserDefaults.standard.string(forKey: "currencyCode_\(trip.id!)") {
-            expense.currencyCode = savedCurrency
+            costInfo.currencyCode = savedCurrency
         }
 
         var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
@@ -199,7 +199,7 @@ final class ActivityFormVM {
             mapItem: mapItem
         )
 
-        try await service.saveItem(item)
+        try await service.saveItem(item, costInfo: costInfo)
     }
 
     // MARK: - Address / Info
