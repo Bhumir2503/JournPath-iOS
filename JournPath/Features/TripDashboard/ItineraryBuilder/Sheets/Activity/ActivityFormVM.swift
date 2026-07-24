@@ -14,15 +14,10 @@ final class ActivityFormVM {
 
     // MARK: - Form State
 
-    var startDate: Date
-    var endDate: Date
-    var isAllDay: Bool = true
-    var title: String = ""
-    var note: String = ""
-
+    var item: ItineraryItem
     var isAddressCopied: Bool = false
-    
-    var costInfo = CostInfo()
+
+    var expense = Expense()
 
     /// The trip's day range expressed as instants in the destination's zone.
     /// Computed in `computeSelectableRange(trip:)` before the pickers render.
@@ -63,8 +58,23 @@ final class ActivityFormVM {
     init(place: PlaceResult) {
         self.place = place
         let fallback = Date()
-        self.startDate = fallback
-        self.endDate = fallback.addingTimeInterval(3600)
+
+        let mapItem = place.mapItem
+        let location = mapItem != nil ? ActivityLocation(mapItem: mapItem!) : ActivityLocation(name: place.title, address: place.subtitle)
+
+        self.item = ItineraryItem(
+            tripId: "",
+            type: .activity,
+            allDay: true,
+            startTime: fallback,
+            endTime: fallback.addingTimeInterval(3600),
+            activity: ActivityPayload(
+                title: "",
+                category: mapItem != nil ? mapToActivityCategory(mapItem!.pointOfInterestCategory) : nil,
+                location: location
+            ),
+            createdBy: "",
+        )
     }
 
     // MARK: - Date Setup
@@ -97,13 +107,13 @@ final class ActivityFormVM {
         hasSetupDates = true
 
         guard let trip else {
-            startDate = Date()
-            endDate = startDate.addingTimeInterval(3600)
+            item.startTime = Date()
+            item.endTime = item.startTime.addingTimeInterval(3600)
             return
         }
-        
-        if let savedCurrency = UserDefaults.standard.string(forKey: "currencyCode_\(trip.id)") {
-            costInfo.currencyCode = savedCurrency
+
+        if let savedCurrency = UserDefaults.standard.string(forKey: "currencyCode_\(trip.id!)") {
+            expense.currencyCode = savedCurrency
         }
 
         var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
@@ -111,17 +121,17 @@ final class ActivityFormVM {
         comps.minute = 0
 
         let start = placeCalendar.date(from: comps) ?? Date()
-        startDate = clampToRange(start)
-        endDate = clampToRange(start.addingTimeInterval(3600))
+        item.startTime = clampToRange(start)
+        item.endTime = clampToRange(start.addingTimeInterval(3600))
 
-        if isAllDay {
+        if item.allDay {
             handleAllDayChange(true)
         }
     }
 
     /// End can't precede start, and can't leave the trip.
     var endSelectableRange: ClosedRange<Date> {
-        let lower = max(startDate, selectableRange.lowerBound)
+        let lower = max(item.startTime, selectableRange.lowerBound)
         return lower...max(lower, selectableRange.upperBound)
     }
 
@@ -132,24 +142,24 @@ final class ActivityFormVM {
     // MARK: - Date Mutation
 
     func validateEndDate() {
-        if endDate < startDate {
-            endDate =
-                isAllDay
-                ? startDate
-                : min(startDate.addingTimeInterval(3600), selectableRange.upperBound)
+        if item.endTime < item.startTime {
+            item.endTime =
+                item.allDay
+                ? item.startTime
+                : min(item.startTime.addingTimeInterval(3600), selectableRange.upperBound)
         }
     }
 
     func handleAllDayChange(_ isAllDay: Bool) {
         if isAllDay {
-            startDate = clampToRange(placeCalendar.startOfDay(for: startDate))
-            endDate = clampToRange(placeCalendar.startOfDay(for: endDate))
+            item.startTime = clampToRange(placeCalendar.startOfDay(for: item.startTime))
+            item.endTime = clampToRange(placeCalendar.startOfDay(for: item.endTime))
         } else {
             let start =
                 placeCalendar.date(
-                    bySettingHour: 10, minute: 0, second: 0, of: startDate) ?? startDate
-            startDate = clampToRange(start)
-            endDate = clampToRange(startDate.addingTimeInterval(3600))
+                    bySettingHour: 10, minute: 0, second: 0, of: item.startTime) ?? item.startTime
+            item.startTime = clampToRange(start)
+            item.endTime = clampToRange(item.startTime.addingTimeInterval(3600))
         }
         validateEndDate()
     }
@@ -157,8 +167,8 @@ final class ActivityFormVM {
     /// Keeps the existing clock times while moving both dates to new days.
     func updateDates(newStart: Date, newEnd: Date) {
         let cal = placeCalendar
-        let startTime = cal.dateComponents([.hour, .minute], from: startDate)
-        let endTime = cal.dateComponents([.hour, .minute], from: endDate)
+        let startTime = cal.dateComponents([.hour, .minute], from: item.startTime)
+        let endTime = cal.dateComponents([.hour, .minute], from: item.endTime)
 
         var s = cal.dateComponents([.year, .month, .day], from: newStart)
         s.hour = startTime.hour
@@ -168,8 +178,8 @@ final class ActivityFormVM {
         e.hour = endTime.hour
         e.minute = endTime.minute
 
-        startDate = clampToRange(cal.date(from: s) ?? newStart)
-        endDate = clampToRange(cal.date(from: e) ?? newEnd)
+        item.startTime = clampToRange(cal.date(from: s) ?? newStart)
+        item.endTime = clampToRange(cal.date(from: e) ?? newEnd)
         validateEndDate()
     }
 
@@ -180,45 +190,16 @@ final class ActivityFormVM {
             throw ActivityFormError.missingLocation
         }
 
-        let tzId = destinationTimeZone.identifier
-
-        // startDate/endDate are already correct instants — the pickers were
-        // pinned to destinationTimeZone, so no conversion is needed here.
-        var trueStart = startDate
-        var trueEnd = endDate
-
-        if isAllDay {
-            trueStart = placeCalendar.startOfDay(for: trueStart)
-            trueEnd = placeCalendar.startOfDay(for: trueEnd)
-        }
-
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let activityPayload = ActivityPayload(
-            title: cleanTitle.isEmpty ? place.title : cleanTitle,
-            category: mapToActivityCategory(mapItem.pointOfInterestCategory),
-            location: ActivityLocation(mapItem: mapItem),
-            participants: nil
-        )
-
-        let newActivity = ItineraryItem(
-            id: nil,
+        item.prepareActivityForSave(
             tripId: tripId,
-            type: .activity,
-            addedBy: Auth.auth().currentUser?.uid ?? "",
-            createdAt: nil,
-            cost: costInfo.totalAmount,
-            currency: costInfo.currencyCode,
-            bookingRef: nil,
-            notes: note.isEmpty ? nil : note,
-            attachments: nil,
-            startTime: trueStart,
-            endTime: trueEnd,
-            timeZoneId: tzId,
-            allDay: isAllDay,
-            activity: activityPayload
+            userId: Auth.auth().currentUser?.uid ?? "",
+            timeZone: destinationTimeZone,
+            placeCalendar: placeCalendar,
+            placeTitle: place.title,
+            mapItem: mapItem
         )
 
-        try await service.saveItem(newActivity)
+        try await service.saveItem(item)
     }
 
     // MARK: - Address / Info

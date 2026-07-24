@@ -24,8 +24,8 @@ struct ActivityFormView: View {
                 titleSection
                 dateAndTimeSection
                 PlaceInfoCard(infoItems: vm.infoItems)
-                CostCard(participantManager: participantManager, info: $vm.costInfo)
-                NotesCard(note: $vm.note)
+                CostCard(participantManager: participantManager, info: $vm.expense)
+                NotesCard(note: noteBinding)
                 StorageCard()
             }
             .padding(.horizontal)
@@ -61,7 +61,7 @@ struct ActivityFormView: View {
                 participantManager?.startListening()
             }
         }
-        .onChange(of: vm.costInfo.currencyCode) { _, newCode in
+        .onChange(of: vm.expense.currencyCode) { _, newCode in
             if let tripId = tripManager.currentTrip?.id {
                 UserDefaults.standard.set(newCode, forKey: "currencyCode_\(tripId)")
             }
@@ -95,17 +95,31 @@ struct ActivityFormView: View {
         )
     }
 
+    private var titleBinding: Binding<String> {
+        Binding(
+            get: { vm.item.activity?.title ?? "" },
+            set: { vm.item.activity?.title = $0 }
+        )
+    }
+    
+    private var noteBinding: Binding<String> {
+        Binding(
+            get: { vm.item.notes ?? "" },
+            set: { vm.item.notes = $0 }
+        )
+    }
+
     // MARK: - Sections
 
     @ViewBuilder
     private var titleSection: some View {
         VStack(spacing: 0) {
-            TextField(vm.place.title, text: $vm.title)
+            TextField(vm.place.title, text: titleBinding)
                 .font(.headline)
                 .padding()
-                .onChange(of: vm.title) { _, newValue in
+                .onChange(of: vm.item.activity?.title ?? "") { _, newValue in
                     if newValue.count > 50 {
-                        vm.title = String(newValue.prefix(50))
+                        vm.item.activity?.title = String(newValue.prefix(50))
                     }
                 }
         }
@@ -121,14 +135,14 @@ struct ActivityFormView: View {
                     Text("Starts")
                     Spacer()
                     DatePicker(
-                        "", selection: $vm.startDate,
+                        "", selection: $vm.item.startTime,
                         in: vm.selectableRange,
-                        displayedComponents: vm.isAllDay ? .date : [.date, .hourAndMinute]
+                        displayedComponents: vm.item.allDay ? .date : [.date, .hourAndMinute]
                     )
                     .labelsHidden()
                     .fixedSize()
                     .environment(\.timeZone, vm.destinationTimeZone)
-                    .onChange(of: vm.startDate) {
+                    .onChange(of: vm.item.startTime) {
                         withAnimation { vm.validateEndDate() }
                     }
                 }
@@ -140,9 +154,9 @@ struct ActivityFormView: View {
                     Text("Ends")
                     Spacer()
                     DatePicker(
-                        "", selection: $vm.endDate,
+                        "", selection: $vm.item.endTime,
                         in: vm.endSelectableRange,
-                        displayedComponents: vm.isAllDay ? .date : [.date, .hourAndMinute]
+                        displayedComponents: vm.item.allDay ? .date : [.date, .hourAndMinute]
                     )
                     .labelsHidden()
                     .fixedSize()
@@ -152,9 +166,9 @@ struct ActivityFormView: View {
 
                 Divider().padding(.leading, 16)
 
-                Toggle("All Day", isOn: $vm.isAllDay)
+                Toggle("All Day", isOn: $vm.item.allDay)
                     .padding()
-                    .onChange(of: vm.isAllDay) { _, newValue in
+                    .onChange(of: vm.item.allDay) { _, newValue in
                         withAnimation(.easeInOut) { vm.handleAllDayChange(newValue) }
                     }
             }
