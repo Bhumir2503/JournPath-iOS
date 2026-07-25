@@ -3,13 +3,10 @@ import Foundation
 import MapKit
 import SwiftUI
 
-enum ActivitySheet: String, Identifiable {
-    case myCurrentLocation
-    var id: String { rawValue }
-}
-
 enum FormDestination: Hashable {
-    case activity(PlaceResult)
+    case activity(MKMapItem)
+    case lodging
+
 }
 
 enum LocationIndicatorStatus: Equatable {
@@ -39,14 +36,14 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    var searchResults: [PlaceResult] = []
+    var searchResults: [MKMapItem] = []
     var isSearching = false
     var hasCompletedSearch = false
 
-    var activeSheet: ActivitySheet?
     var navigationPath: [FormDestination] = []
 
     // MARK: - Location State
+    var showLocationPicker = false
 
     var searchNearLocation: SearchNearLocation? {
         didSet {
@@ -143,8 +140,12 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
 
     /// Resolves the place's timezone, then navigates. Resolution happens
     /// before the form appears so its date pickers are pinned correctly.
-    func routeResolvedItem(_ resolved: PlaceResult) {
-        navigationPath.append(.activity(resolved))
+    func routeResolvedItem(_ resolved: MKMapItem) {
+        if let type = searchTokens.first?.type, type == .lodging {
+            navigationPath.append(.lodging)
+        } else {
+            navigationPath.append(.activity(resolved))
+        }
     }
 
     // MARK: - Search
@@ -188,18 +189,10 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
         hasCompletedSearch = false
 
         searchTask = Task { [weak self] in
-            let results: [PlaceResult]
+            let results: [MKMapItem]
             do {
                 let response = try await MKLocalSearch(request: request).start()
-                results = response.mapItems.map { item in
-                    PlaceResult(
-                        title: item.name ?? "Unknown",
-                        subtitle: item.address?.fullAddress ?? "",
-                        coordinate: item.location.coordinate,
-                        mapItem: item,
-                        timeZone: item.timeZone
-                    )
-                }
+                results = response.mapItems
             } catch {
                 results = []
             }

@@ -13,7 +13,7 @@ struct ActivityFormView: View {
 
     @State private var participantManager: ParticipantManager?
 
-    init(place: PlaceResult, onSaved: @escaping () -> Void = {}) {
+    init(place: MKMapItem, onSaved: @escaping () -> Void = {}) {
         _vm = State(initialValue: ActivityFormVM(place: place))
         self.onSaved = onSaved
     }
@@ -97,8 +97,8 @@ struct ActivityFormView: View {
 
     var titleBinding: Binding<String> {
         Binding(
-            get: { vm.item.activity?.title ?? "" },
-            set: { vm.item.activity?.title = $0 }
+            get: { vm.item.activity?.name ?? "" },
+            set: { vm.item.activity?.name = $0 }
         )
     }
     

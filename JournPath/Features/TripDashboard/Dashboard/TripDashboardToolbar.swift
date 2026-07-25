@@ -32,7 +32,7 @@ struct TripDashboardToolbar: ToolbarContent {
                     router.navigateToTripMap(tripId: tripId)
                 }
             } label: {
-                Image(systemName: "map")
+                Image(systemName: "globe.americas.fill")
             }
             .disabled(trip == nil)
 

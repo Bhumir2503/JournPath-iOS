@@ -15,13 +15,17 @@ struct ItineraryBuilderView: View {
                     } else if vm.hasCompletedSearch && vm.searchResults.isEmpty {
                         ContentUnavailableView.search(text: vm.searchQuery)
                     } else {
-                        searchResultsList
+                        SearchListView(results: vm.searchResults) { place in
+                            vm.routeResolvedItem(place)
+                        }
                     }
                 } else {
-                    categoryList
+                    CategorySelectorView { category in
+                        vm.handleCategoryTap(category: category)
+                    }
                 }
             }
-            .navigationTitle("New Activity")
+            .navigationTitle("Add to Itinerary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -41,34 +45,32 @@ struct ItineraryBuilderView: View {
                     ActivityFormView(place: place) {
                         dismiss()
                     }
+                case .lodging:
+                    EmptyView()
                 }
             }
-        }
-        .searchable(
-            text: $vm.searchQuery,
-            tokens: $vm.searchTokens,
-            prompt: "Search activities and places"
-        ) { token in
-            Label(token.name, systemImage: token.icon)
-        }
-        .sheet(item: $vm.activeSheet) { sheet in
-            switch sheet {
-            case .myCurrentLocation:
+            .searchable(
+                text: $vm.searchQuery,
+                tokens: $vm.searchTokens,
+                prompt: "Search activities and places"
+            ) { token in
+                Label(token.name, systemImage: token.icon)
+            }
+            .sheet(isPresented: $vm.showLocationPicker) {
                 LocationPickerView { location in
                     vm.searchNearLocation = location
                 }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+            .presentationDragIndicator(.visible)
         }
-        .presentationDragIndicator(.visible)
     }
-
     // MARK: - Location Header
 
     private var locationPickerHeader: some View {
         Button {
-            vm.activeSheet = .myCurrentLocation
+            vm.showLocationPicker = true
         } label: {
             HStack(spacing: 6) {
                 switch vm.locationIndicatorStatus {
@@ -108,58 +110,4 @@ struct ItineraryBuilderView: View {
         .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemBackground))
     }
-
-    // MARK: - Category List
-
-    private var categoryList: some View {
-        List {
-            if let firstGroup = categoryGroups.first {
-                Section {
-                    HStack(spacing: 0) {
-                        Spacer()
-                        ForEach(firstGroup.items) { category in
-                            CategoryIconBtn(category: category) {
-                                vm.handleCategoryTap(category: category)
-                            }
-                            Spacer()
-                        }
-                    }
-                }
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            }
-
-            ForEach(categoryGroups.dropFirst()) { group in
-                Section {
-                    ForEach(group.items) { category in
-                        CategoryRowBtn(category: category) {
-                            vm.handleCategoryTap(category: category)
-                        }
-                    }
-                } header: {
-                    Text(group.name)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-    }
-
-    // MARK: - Search Results List
-
-    private var searchResultsList: some View {
-        List {
-            ForEach(vm.searchResults) { result in
-                Button {
-                    vm.routeResolvedItem(result)
-                } label: {
-                    SearchResultRow(result: result)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .animation(.default, value: vm.searchResults.count)
-    }
 }
-
-

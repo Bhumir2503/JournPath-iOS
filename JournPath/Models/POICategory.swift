@@ -1,13 +1,17 @@
 import Foundation
 import MapKit
-// ActivityDisplay.swift
 import SwiftUI
 
-// MARK: - Category Types
+// MARK: - POI Category
 
-// MARK: - POI Category with MapKit Filters
+/// A selectable search category backed by MapKit POI filters.
+///
+/// `color` and `type` are optional at the call site and inherited from the
+/// owning `POICategoryGroup` unless a category overrides them (e.g. Lodging).
+/// This keeps the data table below free of ~50 repeated `.orange` / `.activity`
+/// literals that would otherwise be easy to typo out of sync.
 struct POICategory: Hashable, Identifiable {
-    var id: String { name }
+    let id: UUID
     let name: String
     let icon: String
     let color: Color
@@ -17,139 +21,179 @@ struct POICategory: Hashable, Identifiable {
     var activityDisplay: ActivityDisplay {
         ActivityDisplay(name: name, icon: icon, color: color)
     }
+
+    // Hash/equate on identity only. `Color` has no well-defined equality, so we
+    // deliberately keep it out of the conformance rather than relying on it.
+    static func == (lhs: POICategory, rhs: POICategory) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-// MARK: - Category Group Model
+// MARK: - Category Group
+
 struct POICategoryGroup: Identifiable {
     let id = UUID()
     let name: String
+    let color: Color
+    let defaultType: ItineraryItemType
     let items: [POICategory]
+
+    /// Builds items, injecting the group's color/type unless the spec overrides.
+    init(
+        name: String,
+        color: Color,
+        defaultType: ItineraryItemType = .activity,
+        items: [ItemSpec]
+    ) {
+        self.name = name
+        self.color = color
+        self.defaultType = defaultType
+        self.items = items.map { spec in
+            POICategory(
+                id: UUID(),
+                name: spec.name,
+                icon: spec.icon,
+                color: spec.color ?? color,
+                type: spec.type ?? defaultType,
+                poiFilters: spec.filters
+            )
+        }
+    }
+
+    /// Lightweight per-item spec. Only `color`/`type` differ from the group,
+    /// and only when explicitly set, so the data table stays terse.
+    struct ItemSpec {
+        let name: String
+        let icon: String
+        let filters: [MKPointOfInterestCategory]
+        var color: Color? = nil
+        var type: ItineraryItemType? = nil
+
+        init(
+            _ name: String,
+            _ icon: String,
+            _ filters: [MKPointOfInterestCategory],
+            color: Color? = nil,
+            type: ItineraryItemType? = nil
+        ) {
+            self.name = name
+            self.icon = icon
+            self.filters = filters
+            self.color = color
+            self.type = type
+        }
+    }
 }
 
 // MARK: - Category Data
+
 let categoryGroups: [POICategoryGroup] = [
     POICategoryGroup(
         name: "Travel",
+        color: .blue,
         items: [
-            // POICategory(name: "Flights", icon: "airplane", color: .blue, type: .flight, poiFilters: [.airport]),
-            POICategory(name: "Restaurants", icon: "fork.knife", color: .orange, type: .activity, poiFilters: [.restaurant]),
-            POICategory(name: "Parks", icon: "tree.fill", color: .green, type: .activity, poiFilters: [.nationalPark, .park]),
-            POICategory(name: "Landmarks", icon: "camera.fill", color: .purple, type: .activity, poiFilters: [.landmark]),
-            // POICategory(name: "Hotels", icon: "bed.double.fill", color: .mint, type: .lodging, poiFilters: [.hotel]),
-        ]),
-
+            .init("Restaurants", "fork.knife", [.restaurant], color: .orange),
+            .init("Parks", "tree.fill", [.nationalPark, .park], color: .green),
+            .init("Landmarks", "camera.fill", [.landmark], color: .purple),
+            .init("Lodging", "bed.double.fill", [.hotel], color: .mint, type: .lodging),
+        ]
+    ),
     POICategoryGroup(
         name: "Food & Drink",
+        color: .orange,
         items: [
-            POICategory(name: "Restaurant", icon: "fork.knife", color: .orange, type: .activity, poiFilters: [.restaurant]),
-            POICategory(name: "Cafe", icon: "cup.and.saucer.fill", color: .orange, type: .activity, poiFilters: [.cafe]),
-            POICategory(name: "Bakery", icon: "birthday.cake.fill", color: .orange, type: .activity, poiFilters: [.bakery]),
-            POICategory(name: "Brewery", icon: "mug.fill", color: .orange, type: .activity, poiFilters: [.brewery]),
-            POICategory(name: "Distillery", icon: "drop.fill", color: .orange, type: .activity, poiFilters: [.distillery]),
-            POICategory(name: "Winery", icon: "wineglass.fill", color: .orange, type: .activity, poiFilters: [.winery]),
-            POICategory(name: "Food Market", icon: "basket.fill", color: .orange, type: .activity, poiFilters: [.foodMarket]),
-        ]),
+            .init("Restaurant", "fork.knife", [.restaurant]),
+            .init("Cafe", "cup.and.saucer.fill", [.cafe]),
+            .init("Bakery", "birthday.cake.fill", [.bakery]),
+            .init("Brewery", "mug.fill", [.brewery]),
+            .init("Distillery", "drop.fill", [.distillery]),
+            .init("Winery", "wineglass.fill", [.winery]),
+            .init("Food Market", "basket.fill", [.foodMarket]),
+        ]
+    ),
     POICategoryGroup(
         name: "Arts & Culture",
+        color: .purple,
         items: [
-            POICategory(name: "Museum", icon: "building.columns.fill", color: .purple, type: .activity, poiFilters: [.museum]),
-            POICategory(name: "Concerts", icon: "music.mic", color: .purple, type: .activity, poiFilters: [.musicVenue]),
-            POICategory(name: "Theater", icon: "theatermasks.fill", color: .purple, type: .activity, poiFilters: [.theater]),
-            POICategory(name: "Landmark", icon: "camera.fill", color: .purple, type: .activity, poiFilters: [.landmark]),
-            POICategory(name: "Monument", icon: "building.columns.fill", color: .purple, type: .activity, poiFilters: [.nationalMonument]),
-            POICategory(name: "Castle", icon: "building.fill", color: .purple, type: .activity, poiFilters: [.castle]),
-            POICategory(name: "Fortress", icon: "shield.fill", color: .purple, type: .activity, poiFilters: [.fortress]),
-        ]),
+            .init("Museum", "building.columns.fill", [.museum]),
+            .init("Concerts", "music.mic", [.musicVenue]),
+            .init("Theater", "theatermasks.fill", [.theater]),
+            .init("Landmark", "camera.fill", [.landmark]),
+            .init("Monument", "building.columns.fill", [.nationalMonument]),
+            .init("Castle", "building.fill", [.castle]),
+            .init("Fortress", "shield.fill", [.fortress]),
+        ]
+    ),
     POICategoryGroup(
         name: "Entertainment",
+        color: .pink,
         items: [
-            POICategory(name: "Movie Theater", icon: "film.fill", color: .pink, type: .activity, poiFilters: [.movieTheater]),
-            POICategory(name: "Nightlife", icon: "sparkles", color: .pink, type: .activity, poiFilters: [.nightlife]),
-        ]),
+            .init("Movie Theater", "film.fill", [.movieTheater]),
+            .init("Nightlife", "sparkles", [.nightlife]),
+        ]
+    ),
     POICategoryGroup(
         name: "Parks & Recreation",
+        color: .green,
         items: [
-            POICategory(name: "National Park", icon: "tree.fill", color: .green, type: .activity, poiFilters: [.nationalPark, .park]),
-            POICategory(name: "Beach", icon: "beach.umbrella.fill", color: .green, type: .activity, poiFilters: [.beach]),
-            // POICategory(name: "Campground", icon: "tent.fill", color: .green, type: .lodging, poiFilters: [.campground]),
-            // POICategory(name: "RV Park", icon: "car.fill", color: .green, type: .lodging, poiFilters: [.rvPark]),
-            POICategory(name: "Amusement Park", icon: "ticket.fill", color: .green, type: .activity, poiFilters: [.amusementPark]),
-            POICategory(name: "Zoo", icon: "tortoise.fill", color: .green, type: .activity, poiFilters: [.zoo]),
-            POICategory(name: "Aquarium", icon: "fish.fill", color: .green, type: .activity, poiFilters: [.aquarium]),
-            POICategory(name: "Fairground", icon: "flag.fill", color: .green, type: .activity, poiFilters: [.fairground]),
-            POICategory(name: "Marina", icon: "sailboat.fill", color: .green, type: .activity, poiFilters: [.marina]),
-        ]),
+            .init("National Park", "tree.fill", [.nationalPark, .park]),
+            .init("Beach", "beach.umbrella.fill", [.beach]),
+            .init("Campground", "tent.fill", [.campground]),
+            .init("Amusement Park", "ticket.fill", [.amusementPark]),
+            .init("Zoo", "tortoise.fill", [.zoo]),
+            .init("Aquarium", "fish.fill", [.aquarium]),
+            .init("Fairground", "flag.fill", [.fairground]),
+            .init("Marina", "sailboat.fill", [.marina]),
+        ]
+    ),
     POICategoryGroup(
         name: "Sports",
+        color: .indigo,
         items: [
-            POICategory(name: "Stadium", icon: "sportscourt.fill", color: .indigo, type: .activity, poiFilters: [.stadium]),
-            POICategory(name: "Baseball", icon: "figure.baseball", color: .indigo, type: .activity, poiFilters: [.baseball]),
-            POICategory(name: "Basketball", icon: "figure.basketball", color: .indigo, type: .activity, poiFilters: [.basketball]),
-            POICategory(name: "Soccer", icon: "figure.soccer", color: .indigo, type: .activity, poiFilters: [.soccer]),
-            POICategory(name: "Tennis", icon: "figure.tennis", color: .indigo, type: .activity, poiFilters: [.tennis]),
-            POICategory(name: "Volleyball", icon: "figure.volleyball", color: .indigo, type: .activity, poiFilters: [.volleyball]),
-            POICategory(name: "Golf", icon: "figure.golf", color: .indigo, type: .activity, poiFilters: [.golf]),
-            POICategory(name: "Mini Golf", icon: "flag.fill", color: .indigo, type: .activity, poiFilters: [.miniGolf]),
-            POICategory(name: "Hiking", icon: "figure.hiking", color: .indigo, type: .activity, poiFilters: [.hiking]),
-            POICategory(name: "Rock Climbing", icon: "figure.climbing", color: .indigo, type: .activity, poiFilters: [.rockClimbing]),
-            POICategory(name: "Bowling", icon: "figure.bowling", color: .indigo, type: .activity, poiFilters: [.bowling]),
-            POICategory(name: "Skating", icon: "figure.ice.skating", color: .indigo, type: .activity, poiFilters: [.skating]),
-            POICategory(name: "Skate Park", icon: "figure.skating", color: .indigo, type: .activity, poiFilters: [.skatePark]),
-            POICategory(name: "Skiing", icon: "figure.skiing.downhill", color: .indigo, type: .activity, poiFilters: [.skiing]),
-            POICategory(name: "Go Kart", icon: "flag.checkered", color: .indigo, type: .activity, poiFilters: [.goKart]),
-        ]),
+            .init("Stadium", "sportscourt.fill", [.stadium]),
+            .init("Baseball", "figure.baseball", [.baseball]),
+            .init("Basketball", "figure.basketball", [.basketball]),
+            .init("Soccer", "figure.soccer", [.soccer]),
+            .init("Tennis", "figure.tennis", [.tennis]),
+            .init("Volleyball", "figure.volleyball", [.volleyball]),
+            .init("Golf", "figure.golf", [.golf]),
+            .init("Mini Golf", "flag.fill", [.miniGolf]),
+            .init("Hiking", "figure.hiking", [.hiking]),
+            .init("Rock Climbing", "figure.climbing", [.rockClimbing]),
+            .init("Bowling", "figure.bowling", [.bowling]),
+            .init("Skating", "figure.ice.skating", [.skating]),
+            .init("Skate Park", "figure.skating", [.skatePark]),
+            .init("Skiing", "figure.skiing.downhill", [.skiing]),
+            .init("Go Kart", "flag.checkered", [.goKart]),
+        ]
+    ),
     POICategoryGroup(
         name: "Water Sports",
+        color: .cyan,
         items: [
-            POICategory(name: "Swimming", icon: "figure.pool.swim", color: .cyan, type: .activity, poiFilters: [.swimming]),
-            POICategory(name: "Surfing", icon: "figure.surfing", color: .cyan, type: .activity, poiFilters: [.surfing]),
-            POICategory(name: "Fishing", icon: "figure.fishing", color: .cyan, type: .activity, poiFilters: [.fishing]),
-            POICategory(name: "Kayaking", icon: "oar.2.crossed", color: .cyan, type: .activity, poiFilters: [.kayaking]),
-        ]),
+            .init("Swimming", "figure.pool.swim", [.swimming]),
+            .init("Surfing", "figure.surfing", [.surfing]),
+            .init("Fishing", "figure.fishing", [.fishing]),
+            .init("Kayaking", "oar.2.crossed", [.kayaking]),
+        ]
+    ),
     POICategoryGroup(
         name: "Education",
+        color: .brown,
         items: [
-            POICategory(name: "Library", icon: "books.vertical.fill", color: .brown, type: .activity, poiFilters: [.library]),
-            POICategory(name: "School", icon: "backpack.fill", color: .brown, type: .activity, poiFilters: [.school]),
-            POICategory(name: "University", icon: "graduationcap.fill", color: .brown, type: .activity, poiFilters: [.university]),
-            POICategory(name: "Planetarium", icon: "moon.stars.fill", color: .brown, type: .activity, poiFilters: [.planetarium]),
-        ]),
+            .init("Library", "books.vertical.fill", [.library]),
+            .init("School", "backpack.fill", [.school]),
+            .init("University", "graduationcap.fill", [.university]),
+            .init("Planetarium", "moon.stars.fill", [.planetarium]),
+        ]
+    ),
     POICategoryGroup(
         name: "Health & Safety",
+        color: .red,
         items: [
-            POICategory(name: "Hospital", icon: "cross.case.fill", color: .red, type: .activity, poiFilters: [.hospital]),
-            POICategory(name: "Pharmacy", icon: "pills.fill", color: .red, type: .activity, poiFilters: [.pharmacy]),
-            POICategory(name: "Police", icon: "shield.fill", color: .red, type: .activity, poiFilters: [.police]),
-            POICategory(name: "Fire Station", icon: "flame.fill", color: .red, type: .activity, poiFilters: [.fireStation]),
-        ]),
+            .init("Hospital", "cross.case.fill", [.hospital]),
+            .init("Pharmacy", "pills.fill", [.pharmacy]),
+            .init("Police", "shield.fill", [.police]),
+            .init("Fire Station", "flame.fill", [.fireStation]),
+        ]
+    ),
 ]
-
-// MARK: - Helper Functions
-func mapToActivityCategory(_ mkCategory: MKPointOfInterestCategory?) -> ActivityCategory {
-    guard let mkCategory = mkCategory else { return .other }
-    
-    switch mkCategory {
-    case .restaurant, .bakery, .brewery, .cafe, .foodMarket, .winery, .distillery:
-        return .food
-    case .nationalPark, .park, .beach:
-        return .park
-    case .museum, .nationalMonument, .landmark, .castle, .fortress, .theater:
-        return .culture
-    case .amusementPark, .zoo, .aquarium, .marina:
-        return .sightseeing
-    case .movieTheater, .nightlife, .musicVenue:
-        return .nightlife
-    case .stadium, .baseball, .basketball, .soccer, .tennis, .volleyball, .golf, .miniGolf, .bowling, .skating, .skatePark, .skiing, .goKart:
-        return .sports
-    case .swimming, .surfing, .fishing, .kayaking, .rockClimbing, .hiking:
-        return .adventure
-    case .library, .school, .university, .planetarium:
-        return .education
-    case .hospital, .pharmacy, .police, .fireStation:
-        return .wellness
-    case .store, .postOffice, .bank, .atm, .evCharger, .gasStation, .parking, .carRental, .laundry, .restroom:
-        return .other
-    default:
-        return .other
-    }
-}

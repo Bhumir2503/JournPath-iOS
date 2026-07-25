@@ -72,7 +72,7 @@ extension ContentView {
         case .settings:
             SettingsView()
         case .tripMap(let mapTripId):
-            TripMapView(tripId: mapTripId, tripName: "Map")
+            TripMapView()
         case .tripDashboard(let tripId):
             TripDashboardView(tripId: tripId)
         }

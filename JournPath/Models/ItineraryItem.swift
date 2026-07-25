@@ -4,12 +4,11 @@ import Foundation
 import MapKit
 import SwiftUI
 
-
-
 // MARK: - Itinerary Item
 
 enum ItineraryItemType: String, Codable, Hashable {
     case activity
+    case lodging
     // flight, lodging, transit added later
 }
 
@@ -55,15 +54,10 @@ struct ItineraryItem: Identifiable, Codable, Hashable {
             self.endTime = placeCalendar.startOfDay(for: self.endTime)
         }
 
-        let cleanTitle = (self.activity?.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        self.activity?.title = cleanTitle.isEmpty ? placeTitle : cleanTitle
-        self.activity?.category = mapToActivityCategory(mapItem.pointOfInterestCategory)
-        self.activity?.location = ActivityLocation(mapItem: mapItem)
+        self.activity = ActivityPayload(mapItem: mapItem)
 
         if self.notes?.isEmpty == true {
             self.notes = nil
         }
     }
 }
-
-

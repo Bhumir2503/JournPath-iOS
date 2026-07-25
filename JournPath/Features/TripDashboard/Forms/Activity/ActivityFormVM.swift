@@ -9,7 +9,7 @@ final class ActivityFormVM {
 
     // MARK: - Dependencies
 
-    let place: PlaceResult
+    let place: MKMapItem
     let service = ItineraryService()
 
     // MARK: - Form State
@@ -55,12 +55,11 @@ final class ActivityFormVM {
 
     // MARK: - Init
 
-    init(place: PlaceResult) {
+    init(place: MKMapItem) {
         self.place = place
         let fallback = Date()
 
-        let mapItem = place.mapItem
-        let location = mapItem != nil ? ActivityLocation(mapItem: mapItem!) : ActivityLocation(name: place.title, address: place.subtitle)
+        let activity = ActivityPayload(mapItem: place)
 
         self.item = ItineraryItem(
             tripId: "",
@@ -68,11 +67,7 @@ final class ActivityFormVM {
             allDay: true,
             startTime: fallback,
             endTime: fallback.addingTimeInterval(3600),
-            activity: ActivityPayload(
-                title: "",
-                category: mapItem != nil ? mapToActivityCategory(mapItem!.pointOfInterestCategory) : nil,
-                location: location
-            ),
+            activity: activity,
             createdBy: "",
         )
     }
@@ -186,17 +181,13 @@ final class ActivityFormVM {
     // MARK: - Save
 
     func saveActivity(tripId: String) async throws {
-        guard let mapItem = place.mapItem else {
-            throw ActivityFormError.missingLocation
-        }
-
         item.prepareActivityForSave(
             tripId: tripId,
             userId: Auth.auth().currentUser?.uid ?? "",
             timeZone: destinationTimeZone,
             placeCalendar: placeCalendar,
-            placeTitle: place.title,
-            mapItem: mapItem
+            placeTitle: place.name ?? "Unknown",
+            mapItem: place
         )
 
         try await service.saveItem(item, costInfo: costInfo)
@@ -205,10 +196,7 @@ final class ActivityFormVM {
     // MARK: - Address / Info
 
     func copyAddress() {
-        UIPasteboard.general.string =
-            place.subtitle.isEmpty
-            ? "Location Coordinates Available"
-            : place.subtitle
+        UIPasteboard.general.string = place.placemark.title ?? "Location Coordinates Available"
 
         withAnimation { isAddressCopied = true }
         Task {
@@ -219,10 +207,7 @@ final class ActivityFormVM {
 
     var infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] {
         var items: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] = []
-        let addressText =
-            place.subtitle.isEmpty
-            ? "Location Coordinates Available"
-            : place.subtitle
+        let addressText = place.placemark.title ?? "Location Coordinates Available"
 
         items.append(
             (
@@ -232,35 +217,33 @@ final class ActivityFormVM {
                 }
             ))
 
-        if let mapItem = place.mapItem {
-            if let phone = mapItem.phoneNumber, !phone.isEmpty {
-                items.append(
-                    (
-                        "phone.fill", phone, true,
+        if let phone = place.phoneNumber, !phone.isEmpty {
+            items.append(
+                (
+                    "phone.fill", phone, true,
+                    {
+                        let digits = phone.filter { $0.isNumber || $0 == "+" }
+                        if let url = URL(string: "tel://\(digits)"),
+                            UIApplication.shared.canOpenURL(url)
                         {
-                            let digits = phone.filter { $0.isNumber || $0 == "+" }
-                            if let url = URL(string: "tel://\(digits)"),
-                                UIApplication.shared.canOpenURL(url)
-                            {
-                                UIApplication.shared.open(url)
-                            }
+                            UIApplication.shared.open(url)
                         }
-                    ))
-            }
+                    }
+                ))
+        }
 
-            if let websiteURL = mapItem.url {
-                let clean = websiteURL.absoluteString
-                    .replacingOccurrences(of: "https://", with: "")
-                    .replacingOccurrences(of: "http://", with: "")
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                items.append(
-                    (
-                        "link", clean, true,
-                        {
-                            UIApplication.shared.open(websiteURL)
-                        }
-                    ))
-            }
+        if let websiteURL = place.url {
+            let clean = websiteURL.absoluteString
+                .replacingOccurrences(of: "https://", with: "")
+                .replacingOccurrences(of: "http://", with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            items.append(
+                (
+                    "link", clean, true,
+                    {
+                        UIApplication.shared.open(websiteURL)
+                    }
+                ))
         }
         return items
     }

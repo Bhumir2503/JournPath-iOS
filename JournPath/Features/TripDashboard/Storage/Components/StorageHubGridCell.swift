@@ -31,7 +31,6 @@ extension StorageHubView {
                             ZStack {
                                 Color.black.opacity(0.4)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                                CircularProgressView(progress: vm.downloadProgress, trackColor: .gray, progressColor: .blue)
                             }
                         }
                     }
