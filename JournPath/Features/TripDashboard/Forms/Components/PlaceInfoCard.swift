@@ -1,22 +1,76 @@
+import MapKit
 import SwiftUI
 
 struct PlaceInfoCard: View {
-    let infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)]
-    
+    let place: MKMapItem
+    @State private var isAddressCopied: Bool = false
+    @State private var showingBrowserAlert: Bool = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(infoItems.enumerated()), id: \.offset) { index, item in
+            let addressText = place.address?.fullAddress ?? "Unknown Address"
+
+            InfoRowView(
+                icon: isAddressCopied ? "clipboard.fill" : "mappin.and.ellipse",
+                text: isAddressCopied ? "Address Copied" : addressText,
+                isLink: false,
+                showDivider: true,
+                iconColor: isAddressCopied ? .green : nil,
+                textColor: isAddressCopied ? .green : nil,
+                action: copyAddress
+            )
+
+            if let url = place.url {
                 InfoRowView(
-                    icon: item.icon,
-                    text: item.text,
-                    isLink: item.isLink,
-                    showDivider: index < infoItems.count - 1,
-                    action: item.action
+                    icon: "safari",
+                    text: url.absoluteString,
+                    isLink: true,
+                    showDivider: true,
+                    action: { showingBrowserAlert = true }
+                )
+            }
+
+            if let phoneNumber = place.phoneNumber {
+                InfoRowView(
+                    icon: "phone",
+                    text: phoneNumber,
+                    isLink: true,
+                    showDivider: true,
+                    action: {
+                        let digits = phoneNumber.filter { $0.isNumber || $0 == "+" }
+                        if let url = URL(string: "tel://\(digits)"), UIApplication.shared.canOpenURL(url) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
                 )
             }
         }
         .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .alert("Open in Browser?", isPresented: $showingBrowserAlert) {
+            if let url = place.url {
+                Button("Open in Browser", role: .confirm) {
+                    UIApplication.shared.open(url)
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        } message: {
+            if let url = place.url {
+                Text(url.absoluteString)
+            }
+        }
+    }
+    
+
+    func copyAddress() {
+        UIPasteboard.general.string = place.address?.fullAddress ?? "Unknown Address"
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        withAnimation { isAddressCopied = true }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation { isAddressCopied = false }
+        }
     }
 }
 
@@ -25,6 +79,8 @@ struct InfoRowView: View {
     let text: String
     let isLink: Bool
     let showDivider: Bool
+    var iconColor: Color? = nil
+    var textColor: Color? = nil
     let action: (() -> Void)?
 
     var body: some View {
@@ -33,14 +89,14 @@ struct InfoRowView: View {
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .foregroundStyle(isLink ? Color.blue : Color.secondary)
+                    .foregroundStyle(iconColor ?? (isLink ? Color.blue : Color.secondary))
                     .frame(width: 24, height: 24)
 
                 VStack(spacing: 0) {
                     HStack {
                         Text(text)
                             .font(.subheadline)
-                            .foregroundStyle(isLink ? Color.blue : Color.primary)
+                            .foregroundStyle(textColor ?? (isLink ? Color.blue : Color.primary))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         Spacer()

@@ -10,14 +10,16 @@ final class ActivityFormVM {
     // MARK: - Dependencies
 
     let place: MKMapItem
+
+    // Variables
+    var activityTitle: String = ""
+
     let service = ItineraryService()
 
     // MARK: - Form State
 
     var item: ItineraryItem
     var isAddressCopied: Bool = false
-
-    var costInfo = CostInfo()
 
     /// The trip's day range expressed as instants in the destination's zone.
     /// Computed in `computeSelectableRange(trip:)` before the pickers render.
@@ -57,6 +59,8 @@ final class ActivityFormVM {
 
     init(place: MKMapItem) {
         self.place = place
+        self.activityTitle = String(place.name?.prefix(100) ?? "")
+
         let fallback = Date()
 
         let activity = ActivityPayload(mapItem: place)
@@ -74,54 +78,23 @@ final class ActivityFormVM {
 
     // MARK: - Date Setup
 
-    /// Must run before `setupDates` and before the pickers evaluate their `in:` bounds.
     func computeSelectableRange(trip: Trip?) {
         guard let trip else { return }
-
-        var startComps = Calendar.tripDates.dateComponents(
-            [.year, .month, .day], from: trip.startDate)
-        startComps.hour = 0
-        startComps.minute = 0
-
-        var endComps = Calendar.tripDates.dateComponents(
-            [.year, .month, .day], from: trip.endDate)
-        endComps.hour = 23
-        endComps.minute = 59
-
-        guard let lower = placeCalendar.date(from: startComps),
-            let upper = placeCalendar.date(from: endComps)
-        else { return }
-
+        let zone = destinationTimeZone
+        let lower = trip.startDate.tripDay(at: 0, in: zone)
+        let upper = trip.endDate.tripDay(at: 23, minute: 59, second: 59, in: zone)
         selectableRange = lower...max(lower, upper)
     }
 
-    /// Defaults to 10:00 AM on the trip's first day, in the destination's zone.
-    /// Runs once — re-entry is a no-op so user edits survive view reappearance.
     func setupDates(trip: Trip?) {
         guard !hasSetupDates else { return }
         hasSetupDates = true
 
-        guard let trip else {
-            item.startTime = Date()
-            item.endTime = item.startTime.addingTimeInterval(3600)
-            return
-        }
-
-        if let savedCurrency = UserDefaults.standard.string(forKey: "currencyCode_\(trip.id!)") {
-            costInfo.currencyCode = savedCurrency
-        }
-
-        var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: trip.startDate)
-        comps.hour = 10
-        comps.minute = 0
-
-        let start = placeCalendar.date(from: comps) ?? Date()
+        let start = trip?.startDate.tripDay(at: 10, in: destinationTimeZone) ?? Date()
         item.startTime = clampToRange(start)
         item.endTime = clampToRange(start.addingTimeInterval(3600))
 
-        if item.allDay {
-            handleAllDayChange(true)
-        }
+        if item.allDay { handleAllDayChange(true) }
     }
 
     /// End can't precede start, and can't leave the trip.
@@ -190,62 +163,19 @@ final class ActivityFormVM {
             mapItem: place
         )
 
-        try await service.saveItem(item, costInfo: costInfo)
+        try await service.saveItem(item)
     }
 
     // MARK: - Address / Info
 
     func copyAddress() {
-        UIPasteboard.general.string = place.placemark.title ?? "Location Coordinates Available"
+        UIPasteboard.general.string = place.address?.fullAddress ?? "Unknown Address"
 
         withAnimation { isAddressCopied = true }
         Task {
             try? await Task.sleep(for: .seconds(2))
             withAnimation { isAddressCopied = false }
         }
-    }
-
-    var infoItems: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] {
-        var items: [(icon: String, text: String, isLink: Bool, action: (() -> Void)?)] = []
-        let addressText = place.placemark.title ?? "Location Coordinates Available"
-
-        items.append(
-            (
-                "mappin.and.ellipse", addressText, false,
-                { [weak self] in
-                    self?.copyAddress()
-                }
-            ))
-
-        if let phone = place.phoneNumber, !phone.isEmpty {
-            items.append(
-                (
-                    "phone.fill", phone, true,
-                    {
-                        let digits = phone.filter { $0.isNumber || $0 == "+" }
-                        if let url = URL(string: "tel://\(digits)"),
-                            UIApplication.shared.canOpenURL(url)
-                        {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                ))
-        }
-
-        if let websiteURL = place.url {
-            let clean = websiteURL.absoluteString
-                .replacingOccurrences(of: "https://", with: "")
-                .replacingOccurrences(of: "http://", with: "")
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            items.append(
-                (
-                    "link", clean, true,
-                    {
-                        UIApplication.shared.open(websiteURL)
-                    }
-                ))
-        }
-        return items
     }
 }
 

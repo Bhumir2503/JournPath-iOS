@@ -46,7 +46,6 @@ extension Date {
         return Calendar.current.date(from: components) ?? self
     }
 
-
     func isSameUTCDay(as other: Date) -> Bool {
         var utcCalendar = Calendar(identifier: .gregorian)
         utcCalendar.timeZone = TimeZone(identifier: "UTC")!
@@ -105,6 +104,18 @@ extension Date {
     func toPickerDate(in pickerCalendar: Calendar = .current) -> Date {
         let comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: self)
         return pickerCalendar.date(from: comps)!
+    }
+
+    /// Reinterpret a UTC-midnight trip date as a wall-clock time in `zone`.
+    func tripDay(at hour: Int, minute: Int = 0, second: Int = 0, in zone: TimeZone) -> Date {
+        var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: self)
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = second
+
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = zone
+        return cal.date(from: comps) ?? self
     }
 
     var utcMidnight: Date {
