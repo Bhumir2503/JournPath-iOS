@@ -14,7 +14,7 @@ struct PlaceInfoCard: View {
                 icon: isAddressCopied ? "clipboard.fill" : "mappin.and.ellipse",
                 text: isAddressCopied ? "Address Copied" : addressText,
                 isLink: false,
-                showDivider: true,
+                showDivider: (place.phoneNumber != nil || place.url != nil),
                 iconColor: isAddressCopied ? .green : nil,
                 textColor: isAddressCopied ? .green : nil,
                 action: copyAddress
@@ -25,7 +25,7 @@ struct PlaceInfoCard: View {
                     icon: "safari",
                     text: url.absoluteString,
                     isLink: true,
-                    showDivider: true,
+                    showDivider: (place.phoneNumber != nil),
                     action: { showingBrowserAlert = true }
                 )
             }
@@ -35,7 +35,7 @@ struct PlaceInfoCard: View {
                     icon: "phone",
                     text: phoneNumber,
                     isLink: true,
-                    showDivider: true,
+                    showDivider: false,
                     action: {
                         let digits = phoneNumber.filter { $0.isNumber || $0 == "+" }
                         if let url = URL(string: "tel://\(digits)"), UIApplication.shared.canOpenURL(url) {
@@ -45,6 +45,7 @@ struct PlaceInfoCard: View {
                 )
             }
         }
+        .padding(.vertical, 2)
         .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .alert("Open in Browser?", isPresented: $showingBrowserAlert) {
@@ -60,7 +61,6 @@ struct PlaceInfoCard: View {
             }
         }
     }
-    
 
     func copyAddress() {
         UIPasteboard.general.string = place.address?.fullAddress ?? "Unknown Address"
@@ -90,14 +90,12 @@ struct InfoRowView: View {
             HStack(spacing: 16) {
                 Image(systemName: icon)
                     .foregroundStyle(iconColor ?? (isLink ? Color.blue : Color.secondary))
-                    .frame(width: 24, height: 24)
 
                 VStack(spacing: 0) {
                     HStack {
                         Text(text)
-                            .font(.subheadline)
                             .foregroundStyle(textColor ?? (isLink ? Color.blue : Color.primary))
-                            .lineLimit(2)
+                            .lineLimit(3)
                             .multilineTextAlignment(.leading)
                         Spacer()
                     }

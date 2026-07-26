@@ -4,6 +4,25 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum AttachmentKind: String, Codable, Sendable {
+    case photo, document, scan
+}
+
+struct PendingAttachment: Identifiable, Hashable, Sendable {
+    /// Generated client-side at pick time. Becomes the Firestore doc ID
+    /// AND the Storage path segment: trips/{tripId}/files/{id}/original.{ext}
+    let id: String
+
+    /// Application Support/uploads/{id}.dat — the only copy of the bytes until upload lands.
+    let localPath: URL
+
+    let originalName: String  // "IMG_7519.HEIC"
+    let mimeType: String  // sniffed at pick time
+    let byteSize: Int  // known locally, before upload
+    let kind: AttachmentKind
+    let pickedAt: Date  // becomes clientCreatedAt on the doc
+}
+
 struct Attachment: Identifiable, Hashable, Codable {
     @DocumentID var id: String?
 
@@ -30,7 +49,7 @@ struct Attachment: Identifiable, Hashable, Codable {
         self.fileType = URL(fileURLWithPath: name).getFileType()
         self.isPrivate = isPrivate
         self.url = url
-        self.thumbnailURL = thumbnailURL 
+        self.thumbnailURL = thumbnailURL
         self.storagePath = storagePath
         self.sizeBytes = sizeBytes
     }
@@ -77,5 +96,3 @@ struct ImageFile: Transferable {
         }
     }
 }
-
-

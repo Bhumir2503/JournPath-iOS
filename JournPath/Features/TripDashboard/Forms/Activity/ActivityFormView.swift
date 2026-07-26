@@ -4,15 +4,13 @@ import SwiftUI
 
 struct ActivityFormView: View {
 
-    @State var vm: ActivityFormVM
+    private let trip: Trip
     private let onSaved: () -> Void
 
-    @State private var isSaving = false
-    @State private var saveError: String?
+    @State var vm: ActivityFormVM
 
-    @Environment(TripManager.self) private var tripManager
-
-    init(place: MKMapItem, onSaved: @escaping () -> Void = {}) {
+    init(trip: Trip, place: MKMapItem, onSaved: @escaping () -> Void = {}) {
+        self.trip = trip
         _vm = State(initialValue: ActivityFormVM(place: place))
         self.onSaved = onSaved
     }
@@ -21,10 +19,10 @@ struct ActivityFormView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 TitleCard(title: $vm.activityTitle, placeholder: "Untitled Activity")
-                dateAndTimeSection
+                ActivityFormDateCard(trip: trip, destinationTimeZone: vm.place.timeZone!, startDate: $vm.startDate, endDate: $vm.endDate, allDay: $vm.allDay)
                 PlaceInfoCard(place: vm.place)
-                NotesCard(note: noteBinding)
-                StorageCard()
+                NotesCard(note: $vm.note)
+                StorageCard(pendingAttachments: vm.pendingAttachments)
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
@@ -32,85 +30,20 @@ struct ActivityFormView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("New Activity")
         .navigationBarTitleDisplayMode(.inline)
+        .presentationDragIndicator(.hidden)
         .interactiveDismissDisabled()
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Task { await save() }
-                } label: {
-                    Group {
-                        if isSaving {
-                            ProgressView().tint(.white)
-                        } else {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isSaving)
+        .toolbar { toolbar }
+    }
+
+    var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                vm.saveActivity(tripId: trip.id!)
+                onSaved()
+            } label: {
+                Image(systemName: "checkmark")
             }
-        }
-        .onAppear {
-            vm.computeSelectableRange(trip: tripManager.currentTrip)
-            vm.setupDates(trip: tripManager.currentTrip)
-        }
-        .alert("Couldn't save", isPresented: showingSaveError) {
-            Button("OK") { saveError = nil }
-        } message: {
-            Text(saveError ?? "")
-        }
-        .overlay(alignment: .bottom) {
-            if vm.isAddressCopied {
-                Text("Address Copied")
-                    .font(.subheadline)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color(UIColor.systemBackground))
-                    .foregroundStyle(.primary)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                    .padding(.bottom, 32)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(1)
-            }
-        }
-    }
-
-    private var showingSaveError: Binding<Bool> {
-        Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )
-    }
-
-    var titleBinding: Binding<String> {
-        Binding(
-            get: { vm.item.activity?.name ?? "" },
-            set: { vm.item.activity?.name = $0 }
-        )
-    }
-
-    var noteBinding: Binding<String> {
-        Binding(
-            get: { vm.item.notes ?? "" },
-            set: { vm.item.notes = $0 }
-        )
-    }
-
-    private func save() async {
-        guard let tripId = tripManager.currentTrip?.id else {
-            saveError = "No active trip."
-            return
-        }
-
-        isSaving = true
-        defer { isSaving = false }
-
-        do {
-            try await vm.saveActivity(tripId: tripId)
-            onSaved()
-        } catch {
-            saveError = error.localizedDescription
+            .buttonStyle(.borderedProminent)
         }
     }
 

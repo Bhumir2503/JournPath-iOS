@@ -14,6 +14,7 @@ struct FormCardButton<Content: View>: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .contentShape(Rectangle())
         }
+        .padding(.vertical, 2)
         .buttonStyle(.plain)
     }
 }
@@ -23,22 +24,21 @@ struct NotesCard: View {
     @State private var isEditing = false
 
     var body: some View {
-        FormCardButton(action: {
-            isEditing = true
-        }, backgroundColor: note.isEmpty ? nil : Color.yellow.opacity(0.3)) {
+        FormCardButton(
+            action: {
+                isEditing = true
+            }, backgroundColor: note.isEmpty ? nil : Color.yellow.opacity(0.3)
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 8) {
                     Image(systemName: "note.text")
                         .foregroundStyle(note.isEmpty ? .secondary : .primary)
-                        .frame(width: 24, height: 24)
 
                     Text("Notes")
-                        .font(.subheadline)
                         .foregroundStyle(.primary)
                 }
 
                 Text(note.isEmpty ? "Add a note…" : note)
-                    .font(.subheadline)
                     .foregroundStyle(note.isEmpty ? .secondary : .primary)
                     .lineLimit(10)
                     .multilineTextAlignment(.leading)
@@ -50,4 +50,3 @@ struct NotesCard: View {
         }
     }
 }
-

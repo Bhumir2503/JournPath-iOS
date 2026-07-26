@@ -35,27 +35,29 @@ struct ItineraryItem: Identifiable, Codable, Hashable {
     static func == (lhs: ItineraryItem, rhs: ItineraryItem) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 
-    mutating func prepareActivityForSave(
+    static func createActivityItem(
         tripId: String,
         userId: String,
+        title: String,
+        place: MKMapItem,
+        startTime: Date,
+        endTime: Date,
+        allDay: Bool,
         timeZone: TimeZone,
-        placeCalendar: Calendar,
-        placeTitle: String,
-        mapItem: MKMapItem
-    ) {
-        self.tripId = tripId
-        self.createdBy = userId
-        self.timeZoneId = timeZone.identifier
+        note: String
+    ) -> Self {
+        let place = ActivityPayload(mapItem: place)
+        return ItineraryItem(
+            tripId: tripId,
+            type: .activity,
+            allDay: allDay,
+            startTime: startTime,
+            endTime: endTime,
+            timeZoneId: timeZone.identifier,
+            notes: note,
+            activity: place,
+            createdBy: userId
+        )
+    }
 
-        if self.allDay {
-            self.startTime = placeCalendar.startOfDay(for: self.startTime)
-            self.endTime = placeCalendar.startOfDay(for: self.endTime)
-        }
-
-        self.activity = ActivityPayload(mapItem: mapItem)
-
-        if self.notes?.isEmpty == true {
-            self.notes = nil
-        }
-    } 
 }
