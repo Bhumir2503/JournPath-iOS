@@ -38,28 +38,12 @@ extension Date {
         return nil
     }
 
-    var utcMidnight: Date {
-        let components = Calendar.current.dateComponents([.year, .month, .day], from: self)
-
-        var utcCalendar = Calendar(identifier: .gregorian)
-        utcCalendar.timeZone = TimeZone(identifier: "UTC")!
-        return utcCalendar.date(from: components) ?? self
-    }
-
     var deviceLocalFromUTCMidnight: Date {
         var utcCalendar = Calendar(identifier: .gregorian)
         utcCalendar.timeZone = TimeZone(identifier: "UTC")!
         let components = utcCalendar.dateComponents([.year, .month, .day], from: self)
 
         return Calendar.current.date(from: components) ?? self
-    }
-
-    var displayStringUTC: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        formatter.timeZone = TimeZone(identifier: "UTC")!
-        return formatter.string(from: self)
     }
 
     func isSameUTCDay(as other: Date) -> Bool {
@@ -90,5 +74,59 @@ extension Date {
         destinationCalendar.timeZone = destinationTimeZone
 
         return destinationCalendar.date(from: components) ?? self
+    }
+}
+
+extension Calendar {
+    /// The one calendar allowed to touch trip dates.
+    static let tripDates: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }()
+
+    /// A calendar pinned to an arbitrary zone (for activity day math).
+    static func pinned(to tz: TimeZone) -> Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal
+    }
+}
+
+extension Date {
+    /// Picker → Firestore: the day the user tapped, pinned to midnight UTC.
+    func toTripDate(from pickerCalendar: Calendar = .current) -> Date {
+        let comps = pickerCalendar.dateComponents([.year, .month, .day], from: self)
+        return Calendar.tripDates.date(from: comps)!
+    }
+
+    /// Firestore → Picker: a UTC-midnight timestamp as the same day, locally.
+    func toPickerDate(in pickerCalendar: Calendar = .current) -> Date {
+        let comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: self)
+        return pickerCalendar.date(from: comps)!
+    }
+
+    /// Reinterpret a UTC-midnight trip date as a wall-clock time in `zone`.
+    func tripDay(at hour: Int, minute: Int = 0, second: Int = 0, in zone: TimeZone) -> Date {
+        var comps = Calendar.tripDates.dateComponents([.year, .month, .day], from: self)
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = second
+
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = zone
+        return cal.date(from: comps) ?? self
+    }
+
+    var utcMidnight: Date {
+        let comps = Calendar.current.dateComponents([.year, .month, .day], from: self)
+        return Calendar.tripDates.date(from: comps)!
+    }
+
+    var iso8601: String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        f.timeZone = TimeZone(identifier: "UTC")!
+        return f.string(from: self)  // "2026-10-12T00:00:00Z"
     }
 }

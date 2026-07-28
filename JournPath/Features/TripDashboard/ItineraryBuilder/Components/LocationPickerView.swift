@@ -4,19 +4,28 @@ import MapKit
 import SwiftUI
 import UIKit
 
+struct SearchNearLocation: Codable, Hashable {
+    let name: String
+    let latitude: Double
+    let longitude: Double
+    
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 struct LocationPickerView: View {
     @Environment(\.dismiss) private var dismiss
     
     @StateObject private var vm = LocationPickerVM()
-    @StateObject private var locationManager = LocationManager()
+    @State private var locationManager = LocationManager()
     var onSelect: (SearchNearLocation?) -> Void
     
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    if locationManager.hasPermission || locationManager.locationStatus == .notDetermined {
-                        Button {
+                    if locationManager.hasPermission || locationManager.authorizationStatus == .notDetermined {                        Button {
                             onSelect(nil)
                             dismiss()
                         } label: {

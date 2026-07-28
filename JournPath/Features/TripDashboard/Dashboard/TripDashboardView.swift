@@ -13,6 +13,7 @@ struct TripDashboardView: View {
 
     // States
     @State private var tripManager: TripManager
+    @State private var participantManager: ParticipantManager
 
     // Services
     private let tripService = TripService()
@@ -45,6 +46,7 @@ struct TripDashboardView: View {
     init(tripId: String) {
         self.tripId = tripId
         _tripManager = State(initialValue: TripManager(tripId: tripId))
+        _participantManager = State(initialValue: ParticipantManager(tripId: tripId))
     }
 
     var body: some View {
@@ -65,6 +67,7 @@ struct TripDashboardView: View {
             )
         }
         .environment(tripManager)
+        .environment(participantManager)
         .navigationTitle(tripManager.currentTrip?.name ?? "Loading...")
         .navigationSubtitle(tripManager.dateRangeString)
         .navigationBarTitleDisplayMode(.inline)
@@ -101,6 +104,7 @@ struct TripDashboardView: View {
         }
         .onAppear {
             tripManager.startListening()
+            participantManager.startListening()
             requestNotificationPermission()
         }
         .onChange(of: tripManager.wasRemoved) { _, removed in

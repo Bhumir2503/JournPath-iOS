@@ -4,6 +4,7 @@
 //
 
 import AuthenticationServices
+import CryptoKit
 import FirebaseAuth
 
 class AppleAuthService: NSObject {
@@ -12,13 +13,13 @@ class AppleAuthService: NSObject {
 
     @MainActor
     func getCredential() async throws(AuthError) -> (AuthCredential, String?) {
-        let nonce = AuthCryptoUtils.generateNonce()
+        let nonce = generateNonce()
         currentNonce = nonce
 
         let provider = ASAuthorizationAppleIDProvider()
         let request = provider.createRequest()
         request.requestedScopes = [.email]
-        request.nonce = AuthCryptoUtils.sha256(nonce)
+        request.nonce = sha256(nonce)
 
         let controller = ASAuthorizationController(authorizationRequests: [request])
         controller.delegate = self
@@ -34,6 +35,27 @@ class AppleAuthService: NSObject {
         } catch {
             throw AuthError(firebaseError: error)
         }
+    }
+
+    func generateNonce(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+
+        if errorCode != errSecSuccess {
+            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+        }
+
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        let nonce = randomBytes.map { byte in charset[Int(byte) % charset.count] }
+
+        return String(nonce)
+    }
+
+    func sha256(_ input: String) -> String {
+        let data = Data(input.utf8)
+        let hashed = SHA256.hash(data: data)
+        return hashed.map { String(format: "%02x", $0) }.joined()
     }
 
     @MainActor
@@ -108,4 +130,8 @@ extension AppleAuthService: ASAuthorizationControllerPresentationContextProvidin
 
         return UIWindow(windowScene: windowScene!)
     }
+}
+
+extension AppleAuthService {
+
 }

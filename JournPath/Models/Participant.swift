@@ -34,7 +34,7 @@ enum ParticipantStatus: String, Codable {
     case kicked
 }
 
-struct Participant: Codable, Identifiable {
+struct Participant: Codable, Identifiable, Equatable {
     @DocumentID var id: String?
 
     let role: ParticipantRole

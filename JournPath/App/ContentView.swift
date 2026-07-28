@@ -29,7 +29,7 @@ struct ContentView: View {
             case .loggedIn:
                 mainContent
             case .loggedOut:
-                OnboardingView()
+                SignInView()
             }
         }
         .onOpenURL { url in
@@ -71,8 +71,8 @@ extension ContentView {
             EmptyView()
         case .settings:
             SettingsView()
-        case .tripMap(let mapTripId):
-            TripMapView(tripId: mapTripId, tripName: "Map")
+        case .tripMap:
+            TripMapView()
         case .tripDashboard(let tripId):
             TripDashboardView(tripId: tripId)
         }

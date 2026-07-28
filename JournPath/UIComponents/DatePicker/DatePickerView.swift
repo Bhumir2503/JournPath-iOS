@@ -53,19 +53,21 @@ class DatePickerVM: ObservableObject {
             upperBound = cal.startOfDay(for: range.upperBound)
             self.requiresEndOnOrAfterToday = false
         } else {
-            // Start dates can go up to 3 months into the past — or further
+            // Start dates can go up to 120 days or the start of the month 3 months ago, whichever is smaller.
             // back if an existing selection starts earlier than that.
+            let maxPast120 = cal.date(byAdding: .day, value: -120, to: today) ?? today
             let threeMonthsAgo = cal.date(byAdding: .month, value: -3, to: today) ?? today
-            if let start = initialStartDate {
-                lowerBound = min(cal.startOfDay(for: start), threeMonthsAgo)
-            } else {
-                lowerBound = threeMonthsAgo
-            }
+            let firstOfThreeMonthsAgo = cal.date(from: cal.dateComponents([.year, .month], from: threeMonthsAgo)) ?? threeMonthsAgo
+            let maxPast = max(maxPast120, firstOfThreeMonthsAgo)
+            
+            lowerBound = initialStartDate != nil ? min(cal.startOfDay(for: initialStartDate!), maxPast) : maxPast
 
-            // Max selectable date is 24 months from today.
-            upperBound = cal.startOfDay(
-                for: cal.date(byAdding: .month, value: 24, to: today) ?? today
-            )
+            // Max selectable date is 18 months from today.
+            let eighteenMonths = cal.date(byAdding: .month, value: 18, to: today) ?? today
+            let firstOfUpperMonth = cal.date(from: cal.dateComponents([.year, .month], from: eighteenMonths)) ?? eighteenMonths
+            
+            // Snap to the last day of that month so the whole month is pickable
+            upperBound = cal.date(byAdding: DateComponents(month: 1, day: -1), to: firstOfUpperMonth) ?? eighteenMonths
             self.requiresEndOnOrAfterToday = true
         }
 

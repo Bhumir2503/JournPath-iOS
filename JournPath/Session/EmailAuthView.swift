@@ -9,7 +9,6 @@ enum EmailAuthTextField: Equatable {
 struct EmailAuthView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(AuthViewModel.self) private var authVM
     @Environment(UserManager.self) private var session
     @FocusState private var focusedField: EmailAuthTextField?
 
@@ -20,6 +19,9 @@ struct EmailAuthView: View {
     @State private var isForgotPasswordMode: Bool = false
     @State private var showPasswordRequirements: Bool = false
     @State private var errorClearTask: Task<Void, Never>? = nil
+
+    @State private var error: AuthError?
+    private let authService = AuthService()
 
     private let modeTransitionAnimation: Animation = .smooth(duration: 0.35, extraBounce: 0)
 
@@ -68,7 +70,7 @@ struct EmailAuthView: View {
             }
             .interactiveDismissDisabled()
         }
-        .onChange(of: authVM.error) { _, newValue in
+        .onChange(of: error) { _, newValue in
             if newValue != nil {
                 errorClearTask?.cancel()
                 errorClearTask = Task {
@@ -76,7 +78,7 @@ struct EmailAuthView: View {
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         withAnimation(.easeInOut) {
-                            authVM.error = nil
+                            error = nil
                         }
                     }
                 }
@@ -142,7 +144,7 @@ extension EmailAuthView {
                 .textContentType(.password)
                 .focused($focusedField, equals: .reenterPassword)
                 .submitLabel(.done)
-            
+
             if !reenterPassword.isEmpty {
                 Image(systemName: password == reenterPassword ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .foregroundColor(password == reenterPassword ? .green : .red)
@@ -210,7 +212,7 @@ extension EmailAuthView {
                 }
             } else {
                 Button("Forgot?") {
-                    authVM.error = nil
+                    error = nil
                     isForgotPasswordMode.toggle()
                 }
                 .font(.footnote.bold())
@@ -223,7 +225,7 @@ extension EmailAuthView {
 
     private var submitButtonSection: some View {
         VStack(spacing: 16) {
-            if let error = authVM.error {
+            if let error = error {
                 Text(error.recoverySuggestion ?? "Unknown Error Occurred. Please Contact Support")
                     .font(.footnote)
                     .foregroundColor(.red)
@@ -240,7 +242,7 @@ extension EmailAuthView {
                     isFormStyle: false
                 ) {
                     session.isHandlingManualAuth = true
-                    try await authVM.authenticate(isSignUpMode: isSignUpMode, email: email, password: password, reenterPassword: reenterPassword)
+                    try await authenticate()
                 } closingAction: {
                     dismiss()
                 }
@@ -248,14 +250,14 @@ extension EmailAuthView {
             footerToggleMode
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: canSubmit)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: authVM.error)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: error)
     }
 
     private var footerToggleMode: some View {
         Button {
             let selection = UISelectionFeedbackGenerator()
             selection.selectionChanged()
-            authVM.error = nil
+            error = nil
             withAnimation(modeTransitionAnimation) {
                 isSignUpMode.toggle()
             }
@@ -267,6 +269,22 @@ extension EmailAuthView {
         }
         .frame(maxWidth: .infinity)
         .font(.subheadline)
+    }
+}
+
+extension EmailAuthView {
+    func authenticate() async throws {
+        let cleanEmail = email.cleanUpEmail
+        do {
+            if isSignUpMode {
+                try await authService.signUp(email: cleanEmail, password: password)
+            } else {
+                let _ = try await authService.signIn(email: cleanEmail, password: password)
+            }
+
+        } catch {
+            self.error = error
+        }
     }
 }
 
@@ -288,7 +306,6 @@ struct RequirementRow: View {
     ZStack {
         Color.black.opacity(0.2).ignoresSafeArea()
         EmailAuthView()
-            .environment(AuthViewModel())
             .environment(UserManager())
     }
 }

@@ -7,12 +7,15 @@ import SwiftUI
 @Observable
 final class ParticipantManager {
     // MARK: - State
-    var selfParticipant: Participant? = nil
+    var selfParticipant: Participant? {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return nil }
+        return participants.first(where: { $0.id == currentUserId })
+    }
     var participants: [Participant] = []
     var kickedParticipants: [Participant] = []
 
     // MARK: - Dependencies
-    private let tripId: String
+    let tripId: String
 
     // MARK: - Firestore Listeners
     private var activeListener: ListenerRegistration?

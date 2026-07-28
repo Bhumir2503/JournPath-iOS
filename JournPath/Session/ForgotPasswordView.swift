@@ -8,13 +8,13 @@ import SwiftUI
 struct ForgotPasswordView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(AuthViewModel.self) private var authVM
 
     @Binding var email: String
     @FocusState private var isEmailFocused: Bool
     @State private var errorClearTask: Task<Void, Never>? = nil
 
-    private let modeTransitionAnimation: Animation = .smooth(duration: 0.35, extraBounce: 0)
+    @State private var error: AuthError? = nil
+    private let authService = AuthService()
 
     var body: some View {
         VStack(spacing: 24) {
@@ -36,9 +36,9 @@ struct ForgotPasswordView: View {
             isEmailFocused = true
         }
         .onDisappear {
-            authVM.error = nil
+            error = nil
         }
-        .onChange(of: authVM.error) { _, newValue in
+        .onChange(of: error) { _, newValue in
             if newValue != nil {
                 errorClearTask?.cancel()
                 errorClearTask = Task {
@@ -46,7 +46,7 @@ struct ForgotPasswordView: View {
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         withAnimation(.easeInOut) {
-                            authVM.error = nil
+                            error = nil
                         }
                     }
                 }
@@ -71,7 +71,7 @@ extension ForgotPasswordView {
                 Spacer()
 
                 Button(action: {
-                    authVM.error = nil
+                    error = nil
                     dismiss()
                 }) {
                     Image(systemName: "xmark")
@@ -122,7 +122,7 @@ extension ForgotPasswordView {
 
     private var submitButtonSection: some View {
         VStack(spacing: 16) {
-            if let error = authVM.error {
+            if let error = error {
                 Text(error.recoverySuggestion ?? "Unknown Error Occurred. Please Contact Support")
                     .font(.footnote)
                     .foregroundColor(.red)
@@ -139,20 +139,30 @@ extension ForgotPasswordView {
                     successIconName: "paperplane.fill",
                     isFormStyle: false,
                 ) {
-                    try await authVM.sendResetPasswordLink(email: email)
+                    try await sendResetPasswordLink()
                 } closingAction: {
                     dismiss()
                 }
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: email.isValidEmail)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: authVM.error)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: error)
+    }
+}
+
+extension ForgotPasswordView {
+    func sendResetPasswordLink() async throws {
+        do {
+            try await authService.sendPasswordReset(email: email.cleanUpEmail)
+        } catch {
+            self.error = error
+            throw error
+        }
     }
 }
 
 #Preview {
     @Previewable @State var email = ""
-    
+
     ForgotPasswordView(email: $email)
-        .environment(AuthViewModel())
 }

@@ -8,11 +8,12 @@
 import Lottie
 import SwiftUI
 
-struct OnboardingView: View {
+struct SignInView: View {
     @Environment(\.colorScheme) var colorScheme
-    @State var authVM = AuthViewModel()
     @State var isShowingEmailForm: Bool = false
     @Environment(UserManager.self) private var session
+
+    private let authService = AuthService()
 
     var body: some View {
         GeometryReader { geometry in
@@ -69,13 +70,11 @@ struct OnboardingView: View {
                         .fill(Color(.secondarySystemBackground))
                 )
             }
-            .environment(authVM)
             .ignoresSafeArea(edges: .bottom)
         }
         .sheet(isPresented: $isShowingEmailForm) {
             EmailAuthView()
                 .interactiveDismissDisabled()
-                .environment(authVM)
         }
     }
 
@@ -89,7 +88,7 @@ struct OnboardingView: View {
             successColor: colorScheme == .dark ? .white : .black
         ) {
             session.isHandlingManualAuth = true
-            try await authVM.googleSignIn()
+            try await authService.googleSignIn()
         } closingAction: {
             session.finalizeSignIn()
         }
@@ -104,7 +103,7 @@ struct OnboardingView: View {
             successColor: colorScheme == .dark ? .white : .black
         ) {
             session.isHandlingManualAuth = true
-            try await authVM.appleSignIn()
+            try await authService.appleSignIn()
         } closingAction: {
             session.finalizeSignIn()
         }
