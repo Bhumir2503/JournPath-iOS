@@ -29,7 +29,7 @@ struct TripDashboardToolbar: ToolbarContent {
             // Map Button
             Button {
                 if let tripId = trip?.id {
-                    router.navigateToTripMap(tripId: tripId)
+                    router.navigateToTripMap()
                 }
             } label: {
                 Image(systemName: "globe.americas.fill")
