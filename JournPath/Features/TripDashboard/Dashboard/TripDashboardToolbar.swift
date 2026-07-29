@@ -1,20 +1,18 @@
 import SwiftUI
 
 struct TripDashboardToolbar: ToolbarContent {
-    let trip: Trip?
-    @Environment(TripManager.self) private var tripManager
+    @Environment(TripStore.self) private var trip
 
     // Bindings are "events" that the View handles
     @Binding var activeSheet: DashboardSheet?
     @Binding var activeAlert: DashboardAlert?
-    let shareURL: URL?
 
     @Environment(AppRouter.self) private var router
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             //Share
-            if let url = shareURL {
+            if let url = trip.shareURL {
                 ShareLink(item: url, preview: SharePreview("Join me on my trip on MyJourney")) {
                     Label("Invite Friends", systemImage: "square.and.arrow.up")
                 }
@@ -28,17 +26,15 @@ struct TripDashboardToolbar: ToolbarContent {
 
             // Map Button
             Button {
-                if let tripId = trip?.id {
-                    router.navigateToTripMap()
-                }
+
+                router.navigateToTripMap()
+
             } label: {
                 Image(systemName: "globe.americas.fill")
             }
-            .disabled(trip == nil)
 
             // Command Menu
             TripDashboardMenu(
-                trip: trip,
                 activeSheet: $activeSheet,
                 activeAlert: $activeAlert
             )
@@ -46,7 +42,6 @@ struct TripDashboardToolbar: ToolbarContent {
 
         ToolbarItemGroup(placement: .bottomBar) {
             TripDashboardBottomBar(
-                trip: trip,
                 activeSheet: $activeSheet
             )
         }

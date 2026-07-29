@@ -1,9 +1,8 @@
 import SwiftUI
 
 struct TripDashboardBottomBar: View {
-    let trip: Trip?
     
-    @Environment(TripManager.self) private var tripManager
+    @Environment(ParticipantStore.self) private var participants
     @Binding var activeSheet: DashboardSheet?
 
     var body: some View {
@@ -28,14 +27,13 @@ struct TripDashboardBottomBar: View {
 
             Spacer()
 
-            if tripManager.currentUserRole != .observer {
+            if participants.selfParticipant?.role != .observer {
                 Button {
                     activeSheet = .itineraryBuilder
                 } label: {
                     Label("Add Activity", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(trip == nil)
             }
         }
     }

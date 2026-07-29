@@ -18,10 +18,10 @@ struct TripDashboardHeader: View {
             .scaledToFill()
             .frame(
                 width: geometry.size.width,
-                height: (geometry.size.height * 0.65)
+                height: (geometry.size.height * 0.45)
                     + (scrollOffset < 0 ? abs(scrollOffset) : 0)
             )
-            .offset(y: scrollOffset > 0 ? min(scrollOffset, geometry.size.height * 0.45) : 0)
+            .offset(y: scrollOffset > 0 ? min(scrollOffset, geometry.size.height * 0.25) : 0)
             .clipped()
     }
 }

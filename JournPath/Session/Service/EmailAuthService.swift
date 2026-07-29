@@ -39,7 +39,7 @@ class EmailAuthService {
         do {
             let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
             try await user.reauthenticate(with: credential)
-            try await user.updateEmail(to: newEmail)
+            try await user.sendEmailVerification(beforeUpdatingEmail: email)
         } catch {
             throw AuthError(firebaseError: error)
         }

@@ -5,17 +5,41 @@ import Observation
 import SwiftUI
 
 @Observable
-final class ParticipantManager {
+final class ParticipantStore {
+    // MARK: - Dependencies
+    let tripId: String
+
     // MARK: - State
+    var participants: [Participant] = []
+    var kickedParticipants: [Participant] = []
+
+    // MARK: - Computed Vars
     var selfParticipant: Participant? {
         guard let currentUserId = Auth.auth().currentUser?.uid else { return nil }
         return participants.first(where: { $0.id == currentUserId })
     }
-    var participants: [Participant] = []
-    var kickedParticipants: [Participant] = []
+    var isCaptain: Bool {
+        return selfParticipant?.role == .captain
+    }
 
-    // MARK: - Dependencies
-    let tripId: String
+    var role: ParticipantRole {
+        return selfParticipant?.role ?? .passenger
+    }
+
+    var isKicked: Bool {
+        return selfParticipant?.status == .kicked
+    }
+
+    var sortedParticipants: [Participant] {
+        return participants.sorted { p1, p2 in
+            if p1.role == .captain && p2.role != .captain {
+                return true
+            } else if p1.role != .captain && p2.role == .captain {
+                return false
+            }
+            return p1.joinedAt < p2.joinedAt
+        }
+    }
 
     // MARK: - Firestore Listeners
     private var activeListener: ListenerRegistration?
@@ -26,10 +50,10 @@ final class ParticipantManager {
     }
 
     deinit {
-        stopListening()
+        stop()
     }
 
-    func startListening() {
+    func start() {
         guard !tripId.isEmpty else { return }
         guard activeListener == nil else { return }
 
@@ -56,43 +80,15 @@ final class ParticipantManager {
                         return nil
                     }
                 }
-
-                self.checkAndListenToKicked()
             }
     }
 
     private func checkAndListenToKicked() {
-        if isCaptain {
-            if kickedListener == nil {
-                kickedListener = Firestore.firestore()
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("participants")
-                    .whereField("status", isEqualTo: "kicked")
-                    .addSnapshotListener { [weak self] snapshot, error in
-                        guard let self = self else { return }
-                        if error != nil {
-                            return
-                        }
-                        guard let documents = snapshot?.documents else { return }
 
-                        self.kickedParticipants = documents.compactMap { doc in
-                            do {
-                                return try doc.data(as: Participant.self)
-                            } catch {
-                                return nil
-                            }
-                        }
-                    }
-            }
-        } else {
-            kickedListener?.remove()
-            kickedListener = nil
-            self.kickedParticipants = []
-        }
     }
 
-    func stopListening() {
+    func stop() {
+        AppLogger.managers.info("[ParticipantStore.swift] Stopped listening for active Participant Collection in trip document: \(tripId)")
         activeListener?.remove()
         activeListener = nil
         kickedListener?.remove()
@@ -140,26 +136,6 @@ final class ParticipantManager {
 
         return ParticipantRole.allCases.filter { role in
             role.rank < currentUserRole.rank
-        }
-    }
-
-    var isCaptain: Bool {
-        guard let currentUserId = Auth.auth().currentUser?.uid,
-            let currentUserRole = participants.first(where: { $0.id == currentUserId })?.role
-        else {
-            return false
-        }
-        return currentUserRole == .captain
-    }
-
-    var sortedParticipants: [Participant] {
-        return participants.sorted { p1, p2 in
-            if p1.role == .captain && p2.role != .captain {
-                return true
-            } else if p1.role != .captain && p2.role == .captain {
-                return false
-            }
-            return p1.joinedAt < p2.joinedAt
         }
     }
 }

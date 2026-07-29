@@ -9,7 +9,7 @@ import FirebaseAuth
 import SwiftUI
 
 struct ContentView: View {
-    @State private var session = UserManager()
+    @State private var session = SessionStore()
     @State private var router = AppRouter()
 
     @AppStorage("lastTripId") var lastTripId: String?

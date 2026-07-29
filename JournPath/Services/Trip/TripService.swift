@@ -76,7 +76,7 @@ final class TripService {
         try await db.collection("trips").document(tripId).updateData(updates)
     }
 
-    func leaveTrip(tripId: String) async throws {
+    func leave(tripId: String) async throws {
         let uid = try AuthUtils.requireUserId()
         try await db.collection("users").document(uid).collection("trips").document(tripId).delete()
     }

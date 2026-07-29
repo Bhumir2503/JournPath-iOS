@@ -6,7 +6,7 @@ struct TripListView: View {
     @State private var manager = TripListManager()
 
     @Environment(AppRouter.self) private var router
-    @Environment(UserManager.self) private var session
+    @Environment(SessionStore.self) private var session
 
     @State private var isShowingCreateTrip: Bool = false
 
@@ -192,7 +192,7 @@ extension TripListView.TripListSection {
         guard let id = trip.id else { return }
         Task {
             do {
-                try await tripService.leaveTrip(tripId: id)
+                try await tripService.leave(tripId: id)
             } catch {
                 AppLogger.managers.error("Failed to leave trip: \(error.localizedDescription)")
             }

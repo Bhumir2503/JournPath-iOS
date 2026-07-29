@@ -11,7 +11,7 @@ import SwiftUI
 struct SignInView: View {
     @Environment(\.colorScheme) var colorScheme
     @State var isShowingEmailForm: Bool = false
-    @Environment(UserManager.self) private var session
+    @Environment(SessionStore.self) private var session
 
     private let authService = AuthService()
 

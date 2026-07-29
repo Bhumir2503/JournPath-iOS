@@ -9,7 +9,7 @@ enum EmailAuthTextField: Equatable {
 struct EmailAuthView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(UserManager.self) private var session
+    @Environment(SessionStore.self) private var session
     @FocusState private var focusedField: EmailAuthTextField?
 
     @State private var email: String = ""
@@ -306,6 +306,6 @@ struct RequirementRow: View {
     ZStack {
         Color.black.opacity(0.2).ignoresSafeArea()
         EmailAuthView()
-            .environment(UserManager())
+            .environment(SessionStore())
     }
 }

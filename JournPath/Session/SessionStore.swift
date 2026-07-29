@@ -17,8 +17,8 @@ enum AuthState {
 
 @MainActor
 @Observable
-class UserManager {
-    var currentUser: FirebaseAuth.User?
+class SessionStore {
+    var user: FirebaseAuth.User?
     var state: AuthState = .loading
     var isHandlingManualAuth: Bool = false
 
@@ -37,7 +37,7 @@ class UserManager {
     }
 
     private func handleAuthStateChange(user: FirebaseAuth.User?) async {
-        self.currentUser = user
+        self.user = user
 
         if user != nil {
             if !self.isHandlingManualAuth {
@@ -52,41 +52,41 @@ class UserManager {
 
     func finalizeSignIn() {
         self.isHandlingManualAuth = false
-        if self.currentUser != nil { self.state = .loggedIn }
+        if self.user != nil { self.state = .loggedIn }
     }
 
     func finalizeSignOut() {
         self.isHandlingManualAuth = false
-        if self.currentUser == nil { self.state = .loggedOut }
+        if self.user == nil { self.state = .loggedOut }
     }
 }
 
 // MARK: - Computed Properties (Source of Truth: Firestore)
-extension UserManager {
-    var uid: String? { currentUser?.uid }
+extension SessionStore {
+    var uid: String? { user?.uid }
 
     var displayName: String {
-        currentUser?.displayName ?? "Anonymous"
+        user?.displayName ?? "Anonymous"
     }
 
     var email: String {
-        currentUser?.email ?? "No Email"
+        user?.email ?? "No Email"
     }
 
     var photoURL: String? {
-        currentUser?.photoURL?.absoluteString
+        user?.photoURL?.absoluteString
     }
 
     // Checking providers via Firestore Source of Truth
     var isGoogleLinked: Bool {
-        currentUser?.providerData.contains(where: { $0.providerID == "google.com" }) ?? false
+        user?.providerData.contains(where: { $0.providerID == "google.com" }) ?? false
     }
 
     var isAppleLinked: Bool {
-        currentUser?.providerData.contains(where: { $0.providerID == "apple.com" }) ?? false
+        user?.providerData.contains(where: { $0.providerID == "apple.com" }) ?? false
     }
 
     var isEmailPasswordLinked: Bool {
-        currentUser?.providerData.contains(where: { $0.providerID == "password" }) ?? false
+        user?.providerData.contains(where: { $0.providerID == "password" }) ?? false
     }
 }

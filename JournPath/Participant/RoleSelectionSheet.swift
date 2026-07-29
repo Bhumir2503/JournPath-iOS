@@ -14,7 +14,7 @@ struct RoleSelectionSheet: View {
     @State private var showCaptainAlert = false
     @State private var captaincyConfirmed = false
 
-    @Environment(TripManager.self) private var tripManager
+    @Environment(TripStore.self) private var tripManager
     private var participantService = ParticipantService()
 
     init(

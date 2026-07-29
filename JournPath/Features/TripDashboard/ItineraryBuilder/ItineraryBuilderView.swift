@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ItineraryBuilderView: View {
     @State private var vm = ItineraryBuilderVM()
-    @Environment(TripManager.self) private var trip
+    @Environment(TripStore.self) private var trip
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -43,7 +43,7 @@ struct ItineraryBuilderView: View {
             .navigationDestination(for: FormDestination.self) { destination in
                 switch destination {
                 case .activity(let place):
-                    ActivityFormView(trip: trip.currentTrip!, place: place) {
+                    ActivityFormView(trip: trip.trip!, place: place) {
                         dismiss()
                     }
                 case .lodging:

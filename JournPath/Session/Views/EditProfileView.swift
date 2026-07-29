@@ -5,7 +5,7 @@ import SwiftUI
 
 struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(UserManager.self) var session
+    @Environment(SessionStore.self) var session
 
     private let authService = AuthService()
     private let userStorage = UserStorageService()

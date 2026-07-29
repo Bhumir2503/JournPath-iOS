@@ -4,7 +4,7 @@ import StoreKit
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(UserManager.self) var session
+    @Environment(SessionStore.self) var session
     @Environment(AppRouter.self) private var router
     @Environment(\.requestReview) var requestReview
 

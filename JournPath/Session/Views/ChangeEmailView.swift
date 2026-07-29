@@ -1,34 +1,14 @@
 import SwiftUI
 
-enum ChangeEmailError: Error {
-    case emailsDoNotMatch
-    case invalidEmail
-    case invalidCurrentPassword
-}
-
-extension ChangeEmailError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .emailsDoNotMatch:
-            return "Emails do not match"
-        case .invalidEmail:
-            return "Invalid email address"
-        case .invalidCurrentPassword:
-            return "Invalid current password"
-        }
-    }
-}
-
 struct ChangeEmailView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(UserManager.self) var session
+    @Environment(SessionStore.self) var session
 
     @State private var currentPassword = ""
     @State private var newEmail = ""
     @State private var confirmEmail = ""
     @State private var errorMessage: String? = nil
     @State private var successMessage: String? = nil
-    @State private var error: AuthError?
 
     private enum Field: Hashable {
         case currentPassword, newEmail, confirmEmail
@@ -36,23 +16,9 @@ struct ChangeEmailView: View {
     @FocusState private var focusedField: Field?
 
     private let authService = AuthService()
-    
+
     private var isValid: Bool {
         !currentPassword.isEmpty && newEmail.isValidEmail && newEmail == confirmEmail
-    }
-
-    func updateEmail() async throws {
-        guard newEmail == confirmEmail else {
-            throw ChangeEmailError.emailsDoNotMatch
-        }
-        guard !currentPassword.isEmpty else {
-            throw ChangeEmailError.invalidCurrentPassword
-        }
-        guard newEmail.isValidEmail else {
-            throw ChangeEmailError.invalidEmail
-        }
-
-        try await authService.changeEmail(currentPassword: currentPassword, newEmail: newEmail)
     }
 
     var body: some View {
@@ -69,7 +35,6 @@ struct ChangeEmailView: View {
 
             // New Credentials Section
             Section {
-
                 TextField("New Email", text: $newEmail)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
@@ -100,14 +65,10 @@ struct ChangeEmailView: View {
                     errorMessage = nil
                     successMessage = nil
                     do {
-                        try await updateEmail()
+                        try await authService.changeEmail(currentPassword: currentPassword, newEmail: newEmail)
                         successMessage = "Your email has been successfully updated."
-                    } catch {
-                        if let localizedError = error as? LocalizedError {
-                            errorMessage = localizedError.recoverySuggestion ?? error.localizedDescription
-                        } else {
-                            errorMessage = AuthError(firebaseError: error).recoverySuggestion ?? error.localizedDescription
-                        }
+                    } catch let error as AuthError {
+                        errorMessage = error.recoverySuggestion
                     }
                 } closingAction: {
                     // Do nothing, let the user read the message and dismiss manually

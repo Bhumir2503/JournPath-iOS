@@ -2,10 +2,10 @@ import FirebaseAuth
 import Kingfisher
 import SwiftUI
 
-struct ParticipantManagementView: View {
-    @Environment(UserManager.self) private var user
-    @Environment(TripManager.self) private var trip
-    @State private var participantManager: ParticipantManager
+struct ParticipantListView: View {
+    @Environment(SessionStore.self) private var user
+    @Environment(TripStore.self) private var trip
+    @State private var participantManager: ParticipantStore
 
     private var participantService = ParticipantService()
 
@@ -16,7 +16,7 @@ struct ParticipantManagementView: View {
     @State private var error: AnyAppError? = nil
 
     init(tripId: String) {
-        _participantManager = State(initialValue: ParticipantManager(tripId: tripId))
+        _participantManager = State(initialValue: ParticipantStore(tripId: tripId))
     }
 
     var body: some View {
@@ -31,8 +31,8 @@ struct ParticipantManagementView: View {
                 inviteButton
             }
             .background(Color.systemGroupedBackground)
-            .onAppear { participantManager.startListening() }
-            .onDisappear { participantManager.stopListening() }
+            .onAppear { participantManager.start() }
+            .onDisappear { participantManager.stop() }
             .navigationTitle("Participants")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Kick Member?", isPresented: $showKickAlert, presenting: participantToKick) { participant in
@@ -160,7 +160,7 @@ struct ParticipantManagementView: View {
     }
 
     var sharePreviewTitle: String {
-        "Join me on my trip to \"\(trip.currentTrip?.name ?? "My Journey")\" on MyJourney"
+        "Join me on my trip to \"\(trip.name)\" on JournPath"
     }
 
     // MARK: - Actions
