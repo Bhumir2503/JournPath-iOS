@@ -7,7 +7,10 @@ enum DashboardSheet: String, Identifiable {
 
 struct DashboardSheetView: View {
     let sheet: DashboardSheet
+
     @Environment(TripStore.self) private var tripStore
+    @Environment(\.dismiss) private var dismiss
+    private let tripService = TripService()
 
     var body: some View {
         switch sheet {
@@ -16,7 +19,19 @@ struct DashboardSheetView: View {
         case .expenses: EmptyView()
         case .notes: EmptyView()
         case .itineraryBuilder: EmptyView()
-        case .datePicker: EmptyView()
+        case .datePicker:
+            DatePickerView(
+                initialStartDate: tripStore.trip?.startDate.deviceLocalFromUTCMidnight,
+                initialEndDate: tripStore.trip?.endDate.deviceLocalFromUTCMidnight,
+                onCancel: { dismiss() },
+                onSubmit: { startDate, endDate in
+                    Task {
+                        try? await tripService.updateDates(tripId: tripStore.tripId, startDate: startDate, endDate: endDate)
+                    }
+                    dismiss()
+                }
+            )
+            .presentationDetents([.fraction(0.7)])
         case .imagePicker: EmptyView()
         }
     }
