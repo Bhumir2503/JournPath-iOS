@@ -49,6 +49,7 @@ private struct DashboardAlertModifier: ViewModifier {
     let onLeave: () -> Void
     let onRename: (String) -> Void
 
+    @Environment(TripStore.self) private var trip
     @Environment(AppRouter.self) private var router
     @State private var renameText = ""
 
@@ -61,7 +62,7 @@ private struct DashboardAlertModifier: ViewModifier {
             switch current {
             case .rename:
                 TextField("Trip name", text: $renameText)
-                Button("Save") { onRename(renameText) }
+                Button("Save") { onRename(renameText) }.disabled(trip.name == renameText || renameText.isEmpty || renameText.count > 30)
                 Button("Cancel", role: .cancel) {}
             case .leave:
                 Button("Leave", role: .destructive, action: onLeave)
