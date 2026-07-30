@@ -11,13 +11,13 @@ struct TripDashboardMenu: View {
 
     var body: some View {
         Menu {
-            if participant.role != .observer {
+            if participant.myRole != .observer {
                 Button {
                     activeAlert = .rename
                 } label: {
                     Label("Rename Trip", systemImage: "pencil")
                 }
-                if participant.role == .captain {
+                if participant.myRole == .captain {
                     Button {
                         activeSheet = .datePicker
                     } label: {
@@ -30,7 +30,7 @@ struct TripDashboardMenu: View {
                     Label("Change Background", systemImage: "photo")
                 }
 
-                if participant.role == .captain {
+                if participant.myRole == .captain {
                     Divider()
                 }
             }
@@ -41,7 +41,7 @@ struct TripDashboardMenu: View {
                 Label("Participants", systemImage: "person.3")
             }
 
-            if participant.role != .observer {
+            if participant.myRole != .observer {
                 Divider()
             }
 

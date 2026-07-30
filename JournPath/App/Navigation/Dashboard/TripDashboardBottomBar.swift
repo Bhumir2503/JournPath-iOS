@@ -27,7 +27,7 @@ struct TripDashboardBottomBar: View {
 
             Spacer()
 
-            if participants.selfParticipant?.role != .observer {
+            if participants.me?.role != .observer {
                 Button {
                     activeSheet = .itineraryBuilder
                 } label: {

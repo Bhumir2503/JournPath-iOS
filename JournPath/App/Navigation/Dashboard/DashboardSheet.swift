@@ -14,7 +14,7 @@ struct DashboardSheetView: View {
 
     var body: some View {
         switch sheet {
-        case .participant: EmptyView()
+        case .participant: ParticipantsView()
         case .storage: EmptyView()
         case .expenses: EmptyView()
         case .notes: EmptyView()

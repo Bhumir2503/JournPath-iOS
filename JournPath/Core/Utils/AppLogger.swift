@@ -3,7 +3,7 @@ import Foundation
 @_exported import OSLog
 
 enum AppLogger {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "MyJourneyApp"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "JournPath"
     static let prefix = "[AppLogger] "
 
     // Categories
@@ -12,6 +12,11 @@ enum AppLogger {
     static let auth = Logger(subsystem: subsystem, category: "Authentication")
     static let routing = Logger(subsystem: subsystem, category: "Routing")
     static let managers = Logger(subsystem: subsystem, category: "Managers")
+
+    // Main 
+    static let view = Logger(subsystem: subsystem, category: "View")
+    static let store = Logger(subsystem: subsystem, category: "Store")
+    static let services = Logger(subsystem: subsystem, category: "Services")
 }
 
 // MARK: - Prefix Helper

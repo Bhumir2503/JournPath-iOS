@@ -25,7 +25,7 @@ struct TripDashboardContent: View {
                 DashboardSheetView(sheet: sheet)
             }
             .dashboardAlert($activeAlert, onLeave: leaveTrip, onRename: rename)
-            .onChange(of: participants.selfParticipant?.status) { _, status in
+            .onChange(of: participants.me?.status) { _, status in
                 if status == .kicked { activeAlert = .removed }
             }
     }

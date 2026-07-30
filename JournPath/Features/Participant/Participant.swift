@@ -30,7 +30,7 @@ enum ParticipantStatus: String, Codable {
     case invited
     case accepted
     case declined
-    case removed
+    case left
     case kicked
 }
 
@@ -43,12 +43,50 @@ struct Participant: Codable, Identifiable, Equatable {
     let status: ParticipantStatus
     let joinedAt: Date
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case role
-        case displayName
-        case photoURL
-        case status
-        case joinedAt
+    var photo: URL? {
+        photoURL.flatMap(URL.init(string:))
+    }
+
+    var initials: String {
+        let letters =
+            displayName
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap(\.first)
+            .map(String.init)
+            .joined()
+        return letters.isEmpty ? "?" : letters.uppercased()
+    }
+}
+
+extension ParticipantStatus {
+
+    var isActive: Bool { self == .accepted }
+
+    var isGone: Bool {
+        switch self {
+        case .declined, .left, .kicked: true
+        case .invited, .accepted: false
+        }
+    }
+
+    var badgeText: String? {
+        switch self {
+        case .accepted: nil
+        case .invited: "Pending"
+        case .declined: "Declined"
+        case .left: "Left"
+        case .kicked: "Removed"
+        }
+    }
+
+    var subtitle: String? {
+        switch self {
+        case .accepted: nil
+        case .invited: "Invitation sent"
+        case .declined: "Declined the invitation"
+        case .left: "Left the trip"
+        case .kicked: "Kicked from the trip"
+        }
     }
 }
