@@ -14,7 +14,7 @@ struct TripDashboardHeader: View {
     }
 
     private var parallaxOffset: CGFloat {
-        scrollOffset > 0 ? min(scrollOffset, geometry.size.height * 0.25) : 0
+        scrollOffset > 0 ? min(scrollOffset, geometry.size.height * 0.30) : 0
     }
 
     var body: some View {

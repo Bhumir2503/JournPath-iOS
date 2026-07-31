@@ -90,4 +90,9 @@ final class TripStore {
         tripListener?.remove()
         tripListener = nil
     }
+
+    func retry() {
+        stop()
+        start()
+    }
 }

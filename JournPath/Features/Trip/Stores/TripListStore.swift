@@ -4,14 +4,14 @@ import Observation
 import SwiftUI
 
 @Observable
-final class TripListManager {
-    var trips: [TripInfo] = []
+final class TripListStore {
+    var trips: [Trip] = []
     var hasFetchedTrips: Bool = false
     var searchText: String = ""
 
     private var listener: ListenerRegistration?
 
-    var filteredTrips: [TripInfo] {
+    var filteredTrips: [Trip] {
         if searchText.isEmpty { return trips }
         return trips.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
@@ -23,7 +23,7 @@ final class TripListManager {
         Date().utcMidnight
     }
 
-    var currentTrips: [TripInfo] {
+    var currentTrips: [Trip] {
         let today = todayUTCMidnight
         return
             filteredTrips
@@ -31,7 +31,7 @@ final class TripListManager {
             .sorted { $0.startDate < $1.startDate }
     }
 
-    var upcomingTrips: [TripInfo] {
+    var upcomingTrips: [Trip] {
         let today = todayUTCMidnight
         return
             filteredTrips
@@ -39,7 +39,7 @@ final class TripListManager {
             .sorted { $0.startDate < $1.startDate }  // soonest upcoming first
     }
 
-    var pastTrips: [TripInfo] {
+    var pastTrips: [Trip] {
         let today = todayUTCMidnight
         return
             filteredTrips
@@ -50,17 +50,16 @@ final class TripListManager {
     // MARK: - Lifecycle
     func startListening(userId: String) {
         guard listener == nil else { return }
-        AppLogger.managers.info("[TripListManager.swift] Listening to the Trip Sub-Collection in userId: \(userId)")
+        AppLogger.store.info("[TripListManager.swift] Listening to the Trip Sub-Collection in userId: \(userId)")
 
         listener = Firestore.firestore()
-            .collection("users")
-            .document(userId)
             .collection("trips")
+            .whereField("participantIds", arrayContains: userId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
                 if let error = error {
-                    AppLogger.managers.error("[TripListManager.swift] Listener error: \(error.localizedDescription)")
+                    AppLogger.store.error("[TripListManager.swift] Listener error: \(error.localizedDescription)")
                     self.hasFetchedTrips = true
                     return
                 }
@@ -73,9 +72,9 @@ final class TripListManager {
 
                 let newTrips = documents.compactMap { doc in
                     do {
-                        return try doc.data(as: TripInfo.self)
+                        return try doc.data(as: Trip.self)
                     } catch {
-                        AppLogger.managers.error("[TripListManager.swift] Decode failed for \(doc.documentID): \(error.localizedDescription)")
+                        AppLogger.store.error("[TripListManager.swift] Decode failed for \(doc.documentID): \(error.localizedDescription)")
                         return nil
                     }
                 }

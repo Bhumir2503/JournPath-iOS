@@ -58,7 +58,7 @@ final class TripService {
         try await db.collection("trips").document(tripId).updateData(updates)
     }
 
-    func updateBackground(tripId: String, coverImage: CoverImage) async throws {
+    func updateCoverImage(tripId: String, coverImage: CoverImage) async throws {
         let updates: [String: Any] = [
             "coverImage": coverImage.payload,
             "updatedAt": FieldValue.serverTimestamp(),
@@ -76,9 +76,12 @@ final class TripService {
         try await db.collection("trips").document(tripId).updateData(updates)
     }
 
-    func leave(tripId: String) async throws {
-        let uid = try AuthUtils.requireUserId()
-        try await db.collection("users").document(uid).collection("trips").document(tripId).delete()
+    func leave(tripId: String) async throws(APIError) {
+        let response = try await APIClient.shared.post("/trip/leave", body: ["tripId": tripId])
+
+        guard response["result"] as? [String: Any] != nil else {
+            throw APIError.invalidResponse
+        }
     }
 }
 

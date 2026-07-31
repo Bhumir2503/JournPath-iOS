@@ -44,8 +44,14 @@ struct TripDashboardContent: View {
                         Text(error.localizedDescription)
                     }
                 } actions: {
-                    Button("Go to trips") {
-                        router.popToRoot()
+                    if participants.me?.status == .kicked {
+                        Button("Go to trips") {
+                            router.popToRoot()
+                        }
+                    } else {
+                        Button("Retry") {
+                            tripStore.retry()
+                        }
                     }
                 }
             case .idle, .loading:

@@ -52,8 +52,8 @@ private struct DashboardAlertModifier: ViewModifier {
         ) { current in
             switch current {
             case .rename:
-                TextField("Trip name", text: $renameText)
-                Button("Save") { onRename(renameText) }.disabled(trip.name == renameText || renameText.isEmpty || renameText.count > 30)
+                TextField("Trip name", text: $renameText).onChange(of: renameText) { if renameText.count > 32 { renameText = String(renameText.prefix(32)) } }
+                Button("Save") { onRename(renameText) }.disabled(trip.name == renameText || renameText.isEmpty)
                 Button("Cancel", role: .cancel) {}
             case .leave:
                 Button("Leave", role: .destructive, action: onLeave)

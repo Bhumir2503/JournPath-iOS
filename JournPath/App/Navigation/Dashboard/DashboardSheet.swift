@@ -32,7 +32,17 @@ struct DashboardSheetView: View {
                 }
             )
             .presentationDetents([.fraction(0.7)])
-        case .imagePicker: EmptyView()
+        case .imagePicker:
+            UnsplashImagePicker(
+                preSearchText: tripStore.name,
+                onCancel: {
+                    dismiss()
+                },
+                onSubmit: { image in
+                    Task { try await tripService.updateCoverImage(tripId: tripStore.tripId, coverImage: CoverImage(image)) }
+                    dismiss()
+                }
+            )
         }
     }
 }

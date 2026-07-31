@@ -24,7 +24,7 @@ extension CreateTripView {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 8)
                 .onChange(of: viewModel.name) { _, newValue in
-                    if newValue.count > 25 { bindableVM.name = String(newValue.prefix(25)) }
+                    if newValue.count > 32 { bindableVM.name = String(newValue.prefix(32)) }
                 }
 
                 DateDisplayLabel()
