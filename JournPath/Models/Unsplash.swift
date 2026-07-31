@@ -26,4 +26,5 @@ public struct UnsplashImageURLs: Codable {
 
 public struct UnsplashUser: Codable {
     public let name: String
+    public let profile: String
 }

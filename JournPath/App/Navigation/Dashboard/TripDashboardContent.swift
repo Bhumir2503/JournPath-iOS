@@ -18,16 +18,7 @@ struct TripDashboardContent: View {
             .navigationTitle(tripStore.trip?.name ?? "")
             .navigationSubtitle(tripStore.dateRangeString)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                TripDashboardToolbar(activeSheet: $activeSheet, activeAlert: $activeAlert)
-            }
-            .sheet(item: $activeSheet) { sheet in
-                DashboardSheetView(sheet: sheet)
-            }
-            .dashboardAlert($activeAlert, onLeave: leaveTrip, onRename: rename)
-            .onChange(of: participants.me?.status) { _, status in
-                if status == .kicked { activeAlert = .removed }
-            }
+
     }
 
     @ViewBuilder
@@ -36,16 +27,32 @@ struct TripDashboardContent: View {
             switch tripStore.state {
             case .loaded(let trip):
                 scrollBody(trip: trip)
+                    .sheet(item: $activeSheet) { sheet in
+                        DashboardSheetView(sheet: sheet)
+                    }
+                    .dashboardAlert($activeAlert, onLeave: leaveTrip, onRename: rename)
+                    .toolbar {
+                        TripDashboardToolbar(activeSheet: $activeSheet, activeAlert: $activeAlert)
+                    }
             case .failed(let error):
                 ContentUnavailableView {
                     Label("Couldn't load trip", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text(error.localizedDescription)
+                    if participants.me?.status == .kicked {
+                        Text("You've been kicked from this trip.")
+                    } else {
+                        Text(error.localizedDescription)
+                    }
                 } actions: {
-                    // Button("Retry") { tripStore.retry() }
+                    Button("Go to trips") {
+                        router.popToRoot()
+                    }
                 }
             case .idle, .loading:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .toolbar {
+                        TripDashboardToolbar(activeSheet: $activeSheet, activeAlert: $activeAlert)
+                    }
             }
         }
     }

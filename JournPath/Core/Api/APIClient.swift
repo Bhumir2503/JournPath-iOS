@@ -10,11 +10,17 @@ final class APIClient {
 
     private let baseURL = URL(string: "https://api.journpath.com")!
     private let session: URLSession
+    private let decoder = JSONDecoder()
 
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 20
         self.session = URLSession(configuration: config)
+    }
+
+    /// The API wraps every successful response in `{ "result": ... }`.
+    private struct CallableEnvelope<T: Decodable>: Decodable {
+        let result: T
     }
 
     // MARK: - Public API
@@ -30,6 +36,7 @@ final class APIClient {
         do {
             let request = try await makeRequest(
                 path: path,
+                method: "POST",
                 body: body,
                 requiresAuth: requiresAuth,
                 requiresAppCheck: requiresAppCheck
@@ -40,32 +47,113 @@ final class APIClient {
             return try parse(data: data, response: response)
 
         } catch let error as APIError {
-            // 1. Pass-through: Keeps your backend error messages and status codes perfectly intact.
             throw error
-
         } catch is URLError {
-            // 2. Network failures: Hardware level failures (like Airplane mode).
             throw .noInternetConnection
-
         } catch {
-            // 3. Fallback: For JSON serialization failures or token fetching errors inside makeRequest.
+            throw .unknownServerError(status: 0, message: "An unexpected error occurred: \(error.localizedDescription)")
+        }
+    }
+
+    /// GETs the given path with optional query items and returns the parsed JSON response.
+    @discardableResult
+    func get(
+        _ path: String,
+        query: [String: Any] = [:],
+        requiresAuth: Bool = true,
+        requiresAppCheck: Bool = true
+    ) async throws(APIError) -> [String: Any] {
+        do {
+            let request = try await makeRequest(
+                path: path,
+                method: "GET",
+                query: query,
+                requiresAuth: requiresAuth,
+                requiresAppCheck: requiresAppCheck
+            )
+            let (data, response) = try await session.data(for: request)
+            return try parse(data: data, response: response)
+
+        } catch let error as APIError {
+            throw error
+        } catch is URLError {
+            throw .noInternetConnection
+        } catch {
+            throw .unknownServerError(status: 0, message: "An unexpected error occurred: \(error.localizedDescription)")
+        }
+    }
+
+    /// GETs the given path and decodes the enveloped `result` into `T`.
+    /// Prefer this over the dictionary variant anywhere a Codable model exists.
+    func get<T: Decodable>(
+        _ path: String,
+        query: [String: Any] = [:],
+        as type: T.Type,
+        requiresAuth: Bool = true,
+        requiresAppCheck: Bool = true
+    ) async throws(APIError) -> T {
+        do {
+            let request = try await makeRequest(
+                path: path,
+                method: "GET",
+                query: query,
+                requiresAuth: requiresAuth,
+                requiresAppCheck: requiresAppCheck
+            )
+            let (data, response) = try await session.data(for: request)
+
+            // Reuse the shared status/error handling, then decode the body.
+            try validate(data: data, response: response)
+
+            do {
+                return try decoder.decode(CallableEnvelope<T>.self, from: data).result
+            } catch {
+                #if DEBUG
+                    print("[APIClient] decode failed for \(path): \(error)")
+                #endif
+                throw APIError.invalidResponse
+            }
+
+        } catch let error as APIError {
+            throw error
+        } catch is URLError {
+            throw .noInternetConnection
+        } catch {
             throw .unknownServerError(status: 0, message: "An unexpected error occurred: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Request Building
 
-    /// Builds an authenticated request with the Auth + App Check tokens optionally.
+    /// Builds a request with the Auth + App Check tokens optionally.
+    /// `body` is encoded for methods that carry one; `query` becomes the query string.
     private func makeRequest(
         path: String,
-        body: [String: Any],
+        method: String,
+        body: [String: Any]? = nil,
+        query: [String: Any] = [:],
         requiresAuth: Bool,
         requiresAppCheck: Bool
     ) async throws -> URLRequest {
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var url = baseURL.appendingPathComponent(path)
+
+        if !query.isEmpty {
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                throw APIError.invalidResponse
+            }
+            // URLComponents handles percent-encoding, so spaces and accents are safe.
+            components.queryItems =
+                query
+                .map { URLQueryItem(name: $0.key, value: String(describing: $0.value)) }
+                .sorted { $0.name < $1.name }  // stable order helps URLCache and logs
+
+            guard let built = components.url else { throw APIError.invalidResponse }
+            url = built
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
 
         // 1. Handle Auth Token Conditionally
         if requiresAuth {
@@ -82,26 +170,37 @@ final class APIClient {
             request.setValue(appCheckToken.token, forHTTPHeaderField: "X-Firebase-AppCheck")
         }
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        // 3. Only methods with a body get one - a GET body is dropped by proxies.
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
         return request
     }
 
     // MARK: - Response Parsing
 
-    private func parse(data: Data, response: URLResponse) throws -> [String: Any] {
+    /// Throws the matching APIError for any non-2xx response. Does not decode success bodies.
+    private func validate(data: Data, response: URLResponse) throws {
         guard let http = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
 
-        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-
         guard (200..<300).contains(http.statusCode) else {
-            let message = json?["message"] as? String
-            let errorCode = json?["error"] as? String
-            throw APIError(statusCode: http.statusCode, errorCode: errorCode, message: message)
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            throw APIError(
+                statusCode: http.statusCode,
+                errorCode: json?["error"] as? String,
+                message: json?["message"] as? String
+            )
         }
+    }
 
-        guard let json else {
+    private func parse(data: Data, response: URLResponse) throws -> [String: Any] {
+        try validate(data: data, response: response)
+
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             throw APIError.invalidResponse
         }
 

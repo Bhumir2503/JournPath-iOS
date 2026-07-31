@@ -20,10 +20,7 @@ struct Trip: Identifiable, Codable, Hashable {
 
     // Basic Info
     var name: String
-    var imageURL: String
-    var imageColor: String
-    var imageBlurHash: String
-    var imageAuthor: String
+    var coverImage: CoverImage
 
     // Timestamps
     var startDate: Date
@@ -36,9 +33,7 @@ struct Trip: Identifiable, Codable, Hashable {
     // Premium Flag
     var tier: TripTier
 
-    var dynamicTextColor: Color {
-        Color.accessibleTextColor(for: imageColor)
-    }
+    var dynamicTextColor: Color { coverImage.textColor }
 }
 
 extension Trip {

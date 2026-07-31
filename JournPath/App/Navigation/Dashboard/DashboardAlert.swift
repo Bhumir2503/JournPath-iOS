@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DashboardAlert: Identifiable, Hashable {
-    case rename, leave, tripDeleted, removed, upgraded
+    case rename, leave, upgraded
     case error(String)
 
     var id: Self { self }
@@ -10,8 +10,6 @@ enum DashboardAlert: Identifiable, Hashable {
         switch self {
         case .rename: "Rename Trip"
         case .leave: "Leave Trip?"
-        case .tripDeleted: "Trip Deleted"
-        case .removed: "Removed From Trip"
         case .upgraded: "Premium Access Unlocked"
         case .error: "Something Went Wrong"
         }
@@ -21,16 +19,9 @@ enum DashboardAlert: Identifiable, Hashable {
         switch self {
         case .rename: nil
         case .leave: "You'll lose access to this trip's itinerary, expenses, and files."
-        case .tripDeleted: "This trip has been deleted and is no longer available."
-        case .removed: "You've been removed from this trip."
         case .upgraded: "You now have access to premium features."
         case .error(let m): m
         }
-    }
-
-    /// These pop the user out of the trip rather than dismissing in place.
-    var isTerminal: Bool {
-        self == .tripDeleted || self == .removed
     }
 }
 
@@ -67,8 +58,6 @@ private struct DashboardAlertModifier: ViewModifier {
             case .leave:
                 Button("Leave", role: .destructive, action: onLeave)
                 Button("Cancel", role: .cancel) {}
-            case .tripDeleted, .removed:
-                Button("OK") { router.popToRoot() }
             case .upgraded, .error:
                 Button("OK", role: .cancel) {}
             }

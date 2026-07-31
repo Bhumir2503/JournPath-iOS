@@ -8,9 +8,9 @@ struct TripDashboardHeader: View {
     let scrollOffset: CGFloat
 
     var body: some View {
-        KFImage(URL(string: trip.imageURL))
+        KFImage(URL(string: trip.coverImage.regular))
             .placeholder {
-                if let blurImage = Image(blurHash: trip.imageBlurHash) {
+                if let blurImage = Image(blurHash: trip.coverImage.blurHash) {
                     blurImage.resizable().scaledToFill()
                 }
             }

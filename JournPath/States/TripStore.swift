@@ -71,6 +71,7 @@ final class TripStore {
 
                 guard doc.exists else {
                     self.trip = nil
+                    self.state = .failed(AnyAppError("Failed to Load Trip", "This trip does not exist or you no longer have access to it."))
                     return
                 }
 

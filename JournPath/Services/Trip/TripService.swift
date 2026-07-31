@@ -12,23 +12,30 @@ final class TripService {
 
     private let db = Firestore.firestore()
 
-    func create(name: String, startDate: Date, endDate: Date, imageURL: String, imageColor: String, imageBlurHash: String, imageAuthor: String) async throws(APIError) -> String {
-        let formatter = ISO8601DateFormatter()
+    func create(
+        name: String,
+        startDate: Date,
+        endDate: Date,
+        coverImage: CoverImage
+    ) async throws(APIError) -> String {
 
         let payload: [String: Any] = [
             "trip": [
                 "name": name,
-                "startDate": formatter.string(from: startDate),
-                "endDate": formatter.string(from: endDate),
-                "imageURL": imageURL,
-                "imageColor": imageColor,
-                "imageBlurHash": imageBlurHash,
-                "imageAuthor": imageAuthor,
+                // Match updateDates: trips are day-granular, stored at UTC midnight.
+                "startDate": startDate.utcMidnight.iso8601,
+                "endDate": endDate.utcMidnight.iso8601,
+                "coverImage": coverImage.payload,
             ]
         ]
 
-        let result = try await APIClient.shared.post("/trip/create", body: payload)
-        guard let tripId = result["tripId"] as? String else {
+        let response = try await APIClient.shared.post("/trip/create", body: payload)
+
+        // The API wraps every success in `{ "result": ... }`.
+        guard
+            let result = response["result"] as? [String: Any],
+            let tripId = result["tripId"] as? String
+        else {
             throw APIError.invalidResponse
         }
         return tripId
@@ -43,24 +50,17 @@ final class TripService {
     }
 
     func updateDates(tripId: String, startDate: Date, endDate: Date) async throws {
-        // change to UTC
-        let start = startDate.utcMidnight
-        let end = endDate.utcMidnight
-
         let updates: [String: Any] = [
-            "startDate": start,
-            "endDate": end,
+            "startDate": startDate.utcMidnight,
+            "endDate": endDate.utcMidnight,
             "updatedAt": FieldValue.serverTimestamp(),
         ]
         try await db.collection("trips").document(tripId).updateData(updates)
     }
 
-    func updateBackground(tripId: String, imageBlurHash: String, imageURL: String, imageColor: String, imageAuthor: String) async throws {
+    func updateBackground(tripId: String, coverImage: CoverImage) async throws {
         let updates: [String: Any] = [
-            "imageBlurHash": imageBlurHash,
-            "imageURL": imageURL,
-            "imageColor": imageColor,
-            "imageAuthor": imageAuthor,
+            "coverImage": coverImage.payload,
             "updatedAt": FieldValue.serverTimestamp(),
         ]
         try await db.collection("trips").document(tripId).updateData(updates)
@@ -70,7 +70,7 @@ final class TripService {
         _ = try AuthUtils.requireUserId()
         let updates: [String: Any] = [
             "initialEndDate": initialEndDate,
-            "isPremium": true,
+            "tier": TripTier.premium.rawValue,
             "updatedAt": FieldValue.serverTimestamp(),
         ]
         try await db.collection("trips").document(tripId).updateData(updates)
@@ -86,23 +86,5 @@ final class TripService {
 extension TripService {
     func regenerateInviteToken(tripId: String) async throws {
         try await APIClient.shared.post("/trip/regenerateInviteToken", body: ["tripId": tripId])
-    }
-}
-
-// MARK: - Errors
-enum TripServiceError: LocalizedError {
-    case notAuthenticated
-    case invalidResponse
-    case serverError(status: Int, message: String?)
-
-    var errorDescription: String? {
-        switch self {
-        case .notAuthenticated:
-            return "You must be signed in to do this."
-        case .invalidResponse:
-            return "The server returned an unexpected response."
-        case .serverError(let status, let message):
-            return message ?? "Request failed with status \(status)."
-        }
     }
 }

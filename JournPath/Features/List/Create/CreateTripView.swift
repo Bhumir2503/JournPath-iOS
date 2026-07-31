@@ -22,7 +22,7 @@ struct CreateTripView: View {
             }
             .ignoresSafeArea()
             .toolbar { toolbar }
-            .task { vm.loadLocalImages() }
+
         }
         .environment(vm)
     }
