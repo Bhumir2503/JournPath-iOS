@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TripDashboardBottomBar: View {
-    
+
     @Environment(ParticipantStore.self) private var participants
     @Binding var activeSheet: DashboardSheet?
 
@@ -14,13 +14,13 @@ struct TripDashboardBottomBar: View {
             }
 
             Button {
-                activeSheet = .storage
+                activeSheet = .expenses
             } label: {
                 Label("Expenses", systemImage: "dollarsign.circle")
             }
 
             Button {
-                activeSheet = .storage
+                activeSheet = .notes
             } label: {
                 Label("Notes", systemImage: "list.bullet.clipboard")
             }
