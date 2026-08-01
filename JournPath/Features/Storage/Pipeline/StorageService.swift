@@ -1,17 +1,9 @@
 import FirebaseStorage
 import Foundation
 
-protocol StorageServicing: Sendable {
-    func upload(
-        localURL: URL, to path: String, contentType: String,
-        onProgress: @escaping @Sendable (Double) -> Void) async throws
-    func downloadURL(for path: String) async throws -> URL
-    func delete(path: String) async throws
-}
-
 /// Uses Firebase Storage's own resumable upload machinery rather than a raw
 /// background URLSession — it survives suspension and handles retry/backoff.
-final class StorageService: StorageServicing, @unchecked Sendable {
+final class StorageService: @unchecked Sendable {
     static let shared = StorageService()
 
     private let storage: Storage
@@ -59,6 +51,10 @@ final class StorageService: StorageServicing, @unchecked Sendable {
         try await storage.reference(withPath: path).downloadURL()
     }
 
+    func download(path: String, maxBytes: Int64 = 200 * 1_024 * 1_024) async throws -> Data {
+        try await storage.reference(withPath: path).data(maxSize: maxBytes)
+    }
+
     func delete(path: String) async throws {
         try await storage.reference(withPath: path).delete()
     }
@@ -69,3 +65,6 @@ final class StorageService: StorageServicing, @unchecked Sendable {
 
     enum StorageError: Error { case unknown }
 }
+
+
+

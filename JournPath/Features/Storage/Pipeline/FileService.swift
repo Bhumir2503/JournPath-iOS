@@ -1,16 +1,7 @@
 import FirebaseFirestore
 import Foundation
 
-protocol FileServicing: Sendable {
-    func markUploading(tripId: String, fileId: String) async throws
-    func markFailed(tripId: String, fileId: String, error: String, attempts: Int) async throws
-    func retry(tripId: String, fileId: String) async throws
-    func delete(tripId: String, fileId: String) async throws
-    func addFiles(_ files: [PendingFile], tripId: String, parentType: ParentType,
-                  parentId: String, uid: String) throws
-}
-
-struct FileService: FileServicing {
+struct FileService {
     static let shared = FileService()
 
     private let db: Firestore

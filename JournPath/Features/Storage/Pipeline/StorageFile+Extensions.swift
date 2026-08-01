@@ -43,9 +43,6 @@ extension PendingFile {
             "clientCreatedAt": Timestamp(date: pickedAt),
             "status": FileStatus.pending.rawValue,
             "uploadAttempts": 0,
-            "lastError": NSNull(),
-            "storagePath": NSNull(),
-            "thumbnailPath": NSNull(),
             "createdAt": FieldValue.serverTimestamp(),
             "updatedAt": FieldValue.serverTimestamp(),
         ]
