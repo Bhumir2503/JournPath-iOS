@@ -11,8 +11,13 @@ extension StorageFile {
     var isInFlight: Bool { status == .pending || status == .uploading }
 
     /// The uploader still has local bytes for in-flight files.
-    var localPath: URL? {
-        guard let id, isInFlight, FileCache.exists(id) else { return nil }
+    func localPath(currentUid: String?) -> URL? {
+        guard let id,
+            let currentUid,
+            uploadedBy == currentUid,
+            isInFlight,
+            FileCache.exists(id)
+        else { return nil }
         return FileCache.path(for: id)
     }
 
@@ -42,6 +47,7 @@ extension PendingFile {
             "parentId": parentId,
             "clientCreatedAt": Timestamp(date: pickedAt),
             "status": FileStatus.pending.rawValue,
+            "quotaRejected": false,
             "uploadAttempts": 0,
             "createdAt": FieldValue.serverTimestamp(),
             "updatedAt": FieldValue.serverTimestamp(),

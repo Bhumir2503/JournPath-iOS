@@ -34,6 +34,7 @@ struct StorageFile: Identifiable, Codable, Hashable, Sendable {
     var height: Int?
     var durationSeconds: Double?
     var processedAt: Date?
+    var quotaRejected: Bool = false
 
     @ServerTimestamp var createdAt: Date?
     @ServerTimestamp var updatedAt: Date?
