@@ -11,6 +11,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var session = SessionStore()
     @State private var router = AppRouter()
+    @State private var uploads = UploadManager()
 
     @AppStorage("lastTripId") var lastTripId: String?
     @AppStorage("pendingTripId") var pendingTripId: String?
@@ -45,6 +46,7 @@ struct ContentView: View {
             }
         }
         .environment(session)
+        .environment(uploads)
         .overlay { joiningTripOverlay }
         .alert(error: $deepLinkError)
     }

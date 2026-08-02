@@ -18,6 +18,7 @@ final class TripSession {
     func start() {
         trip.start()
         participants.start()
+        storage.start()
     }
 
     func stop() {
