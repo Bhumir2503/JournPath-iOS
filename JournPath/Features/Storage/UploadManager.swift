@@ -41,7 +41,7 @@ final class UploadManager {
             .whereField("status", in: [FileStatus.pending.rawValue,
                                        FileStatus.uploading.rawValue])
             .addSnapshotListener { [weak self] snapshot, error in
-                MainActor.assumeIsolated { self?.handle(snapshot, error, tripId: tripId) }
+                self?.handle(snapshot, error, tripId: tripId)
             }
     }
 

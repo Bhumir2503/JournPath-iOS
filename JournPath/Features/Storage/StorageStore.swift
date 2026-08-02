@@ -33,7 +33,7 @@ final class StorageStore {
         listener = db.collection("trips").document(tripId).collection("files")
             .order(by: "clientCreatedAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
-                MainActor.assumeIsolated { self?.handle(snapshot, error) }
+                self?.handle(snapshot, error)
             }
     }
 
@@ -41,12 +41,6 @@ final class StorageStore {
         AppLogger.store.info("[StorageStore] stop \(self.tripId)")
         listener?.remove()
         listener = nil
-    }
-
-    func retry() {
-        stop()
-        state = .idle
-        start()
     }
 
     private func handle(_ snapshot: QuerySnapshot?, _ error: Error?) {

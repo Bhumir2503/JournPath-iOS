@@ -55,9 +55,7 @@ struct StorageView: View {
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 0) {
-            StorageQuotaBar()
-                .padding(.horizontal)
-                .padding(.top, 8)
+
 
             switch store.state {
             case .idle, .loading:
@@ -92,9 +90,6 @@ struct StorageView: View {
                         currentUid: session.uid,
                         thumbnailURL: vm.thumbnailURL(for:),
                         progress: uploads.progress(for:),
-                        onTap: { selected = $0 },
-                        onRetry: { _ in print("Error") },
-                        onDelete: { _ in print("Error") }
                     )
                     .padding(.vertical, 12)
                 }
@@ -105,6 +100,7 @@ struct StorageView: View {
 
     // MARK: - Toolbar
 
+    @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             if vm.isStaging {
@@ -123,5 +119,9 @@ struct StorageView: View {
                 }
             }
         }
+
+        ToolbarItem(placement: .bottomBar) {
+            StorageQuotaBar()
+        }.sharedBackgroundVisibility(.hidden)
     }
 }

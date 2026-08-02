@@ -6,22 +6,16 @@ struct StorageFileCell: View {
     let currentUid: String?
     let thumbnailURL: URL?
     let progress: Double?
-    let onTap: () -> Void
-    let onRetry: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: StorageGridMetrics.labelSpacing) {
+        Button(action: {}) {
+            VStack(alignment: .center, spacing: 6) {
                 preview
-                    .frame(
-                        width: StorageGridMetrics.thumbnailSize,
-                        height: StorageGridMetrics.thumbnailSize
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(alignment: .topTrailing) { statusBadge.padding(5) }
-                    .overlay { overlays }
+                .frame(maxWidth: 120, maxHeight: 120)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .center, spacing: 1) {
                     Text(file.originalName)
                         .font(.caption2)
                         .lineLimit(1)
@@ -30,20 +24,11 @@ struct StorageFileCell: View {
 
                     Text(file.displaySize)
                         .font(.caption2)
+                        .lineLimit(1)
                         .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 0)
                 }
-                .frame(
-                    width: StorageGridMetrics.thumbnailSize,
-                    height: StorageGridMetrics.labelHeight,
-                    alignment: .topLeading
-                )
             }
-            .frame(
-                width: StorageGridMetrics.thumbnailSize,
-                height: StorageGridMetrics.cellHeight
-            )
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .buttonStyle(.plain)
     }
@@ -86,41 +71,7 @@ struct StorageFileCell: View {
                         .tint(.white)
                 }
             }
-        case .failed:
-            ZStack {
-                Color.black.opacity(0.4)
-                if file.quotaRejected {
-                    Text("Storage full")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(4)
-                } else if file.uploadedBy == currentUid {
-                    Button(action: onRetry) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.callout.bold())
-                            .foregroundStyle(.white)
-                            .padding(10)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        case .pending, .uploaded:
-            EmptyView()
-        }
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        switch file.status {
-        case .pending:
-            badge("clock.fill", .gray)
-        case .uploading:
-            badge("arrow.up", .blue)
-        case .failed:
-            badge("exclamationmark", .red)
-        case .uploaded:
+        case .failed, .pending, .uploaded:
             EmptyView()
         }
     }

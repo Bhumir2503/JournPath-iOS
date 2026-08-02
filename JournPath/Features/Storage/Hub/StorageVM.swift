@@ -140,7 +140,6 @@ final class StorageVM {
         produce: (Int) async throws -> PendingFile
     ) async {
         guard let uid else {
-//            present(StagingError.notSignedIn)
             return
         }
 
@@ -159,7 +158,7 @@ final class StorageVM {
                     throw error
                 }
             } catch {
-                /*present(error)     */     // per-file: one bad pick doesn't kill the rest
+                AppLogger.viewmodel.error("[StorageVM] stageAll: \(error.localizedDescription)")
             }
         }
     }
