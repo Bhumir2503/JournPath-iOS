@@ -1,3 +1,4 @@
+// Files/Hub/StorageGridMetrics.swift
 import SwiftUI
 
 struct StorageGrid: View {
@@ -9,16 +10,18 @@ struct StorageGrid: View {
     let onRetry: (StorageFile) -> Void
     let onDelete: (StorageFile) -> Void
 
-    private let spacing: CGFloat = 12
-
-    /// Fixed three columns. `.flexible()` divides the available width evenly,
-    /// so cells grow with the screen instead of wrapping to four on a Pro Max.
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3)
+        Array(
+            repeating: GridItem(
+                .fixed(StorageGridMetrics.thumbnailSize),
+                spacing: StorageGridMetrics.spacing
+            ),
+            count: StorageGridMetrics.columns
+        )
     }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: spacing) {
+        LazyVGrid(columns: columns, spacing: StorageGridMetrics.spacing) {
             ForEach(files) { file in
                 StorageFileCell(
                     file: file,
@@ -36,7 +39,7 @@ struct StorageGrid: View {
                             Label("View", systemImage: "eye")
                         }
                     }
-                    if canDelete(file) {
+                    if file.uploadedBy == currentUid {
                         Button(role: .destructive) {
                             onDelete(file)
                         } label: {
@@ -46,11 +49,31 @@ struct StorageGrid: View {
                 }
             }
         }
-        .padding(.horizontal, spacing)
+        .frame(maxWidth: .infinity)  // centers the fixed-width grid
+        .padding(.horizontal, StorageGridMetrics.horizontalPadding)
         .animation(.default, value: files.map(\.id))
     }
+}
 
-    private func canDelete(_ file: StorageFile) -> Bool {
-        file.uploadedBy == currentUid
+enum StorageGridMetrics {
+    static let columns = 3
+    static let spacing: CGFloat = 12
+    static let horizontalPadding: CGFloat = 12
+
+    /// Thumbnail is square; the label block is a fixed two-line strip so every
+    /// cell is the same height regardless of filename length.
+    static let labelHeight: CGFloat = 32
+    static let labelSpacing: CGFloat = 6
+
+    /// Derived from the narrowest supported width (iPhone SE, 375pt) so the
+    /// same cell size works everywhere. On wider screens the grid centers
+    /// with extra gutter rather than stretching.
+    static let thumbnailSize: CGFloat = {
+        let available = 375 - (horizontalPadding * 2) - (spacing * CGFloat(columns - 1))
+        return floor(available / CGFloat(columns))  // 109
+    }()
+
+    static var cellHeight: CGFloat {
+        thumbnailSize + labelSpacing + labelHeight
     }
 }

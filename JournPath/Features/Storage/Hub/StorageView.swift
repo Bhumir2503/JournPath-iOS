@@ -9,11 +9,13 @@ struct StorageView: View {
     @State private var vm: StorageVM
     @State private var activeSource: FilePickerSource?
     @State private var photoItems: [PhotosPickerItem] = []
+    @State private var selected: StorageFile?
 
-    @Environment(SessionStore.self) private var session
-    @Environment(StorageStore.self) private var store
-    
-    @State private var vm: StorageVM?
+    /// Constructed here rather than in `.task` — construction is pure, and
+    /// rebuilding on every reappearance would drop the resolved thumbnails.
+    init(uid: String?) {
+        _vm = State(initialValue: StorageVM(uid: uid))
+    }
 
     var body: some View {
         NavigationStack {
@@ -26,23 +28,25 @@ struct StorageView: View {
                 .onChange(of: store.files.compactMap(\.thumbnailPath).count) { _, _ in
                     Task { await vm.resolveThumbnails(for: store.files) }
                 }
-                .modifier(FilePickers(
-                    activeSource: $activeSource,
-                    photoItems: $photoItems,
-                    onFiles: { vm.stage($0, tripId: store.tripId) },
-                    onPhotos: { await vm.stage(photos: $0, tripId: store.tripId) },
-                    onImage: { vm.stage(image: $0, tripId: store.tripId) },
-                    onScan: { vm.stage(scan: $0, tripId: store.tripId) },
-                    onError: { vm.present($0) }
-                ))
+                .modifier(
+                    FilePickers(
+                        activeSource: $activeSource,
+                        photoItems: $photoItems,
+                        onFiles: { vm.stage($0, tripId: store.tripId) },
+                        onPhotos: { await vm.stage(photos: $0, tripId: store.tripId) },
+                        onImage: { vm.stage(image: $0, tripId: store.tripId) },
+                        onScan: { vm.stage(scan: $0, tripId: store.tripId) },
+                        onError: { _ in print("Error") }
+                    )
+                )
                 .alert("Something went wrong", isPresented: $vm.showingError) {
                     Button("OK", role: .cancel) {}
                 } message: {
                     Text(vm.errorMessage ?? "")
                 }
-                .sheet(item: $selected) { file in
-                    FileDetailView(file: file)
-                }
+                // .sheet(item: $selected) { file in
+                //     FileDetailView(file: file)
+                // }
         }
     }
 
@@ -79,71 +83,29 @@ struct StorageView: View {
                     systemImage: "folder.badge.questionmark",
                     description: Text("Add photos or documents to your trip")
                 )
-            }
-            .toolbar { Toolbar }
-            .background(Color.systemGroupedBackground)
-            .navigationTitle("Storage Hub")
-            .navigationBarTitleDisplayMode(.inline)
-            .task {
-                self.vm = StorageVM(uid: session.uid)
-                await vm?.resolveThumbnails(for: store.files)
-            }
-            .onChange(of: store.files) { _, files in
-                Task { await vm?.resolveThumbnails(for: files) }
-            }
-            .fullScreenCover(item: fullScreenBinding) { source in
-                    switch source {
-                    case .camera:
-                        CameraView { vm?.stage(image: $0, tripId: store.tripId) }
-                            .ignoresSafeArea()
-                    case .scanner:
-                        DocumentScannerView { vm?.stage(scan: $0, tripId: store.tripId) }
-                            .ignoresSafeArea()
-                    default:
-                        EmptyView()
-                    }
-                }
+                Spacer()
 
-                .fileImporter(
-                    isPresented: binding(for: .files),
-                    allowedContentTypes: [.image, .pdf, .plainText],
-                    allowsMultipleSelection: true
-                ) { result in
-                    activeSource = nil
-                    if case .success(let urls) = result {
-                         vm?.stage(urls, tripId: store.tripId)
-                    }
+            case .loaded:
+                ScrollView {
+                    StorageGrid(
+                        files: store.files,
+                        currentUid: session.uid,
+                        thumbnailURL: vm.thumbnailURL(for:),
+                        progress: uploads.progress(for:),
+                        onTap: { selected = $0 },
+                        onRetry: { _ in print("Error") },
+                        onDelete: { _ in print("Error") }
+                    )
+                    .padding(.vertical, 12)
                 }
-
-                .photosPicker(
-                    isPresented: binding(for: .photoLibrary),
-                    selection: $photoItems,
-                    matching: .images
-                ).onChange(of: photoItems) { _, items in
-                    guard !items.isEmpty else { return }
-                    let picked = items
-                    photoItems = []
-                    activeSource = nil
-                    Task { await vm?.stage(photos: picked, tripId: store.tripId) }
-                }
+                .scrollIndicators(.hidden)
+            }
         }
     }
-    
-    private var fullScreenBinding: Binding<FilePickerSource?> {
-        Binding(
-            get: { activeSource?.isFullScreen == true ? activeSource : nil },
-            set: { if $0 == nil { activeSource = nil } }
-        )
-    }
 
-    private func binding(for source: FilePickerSource) -> Binding<Bool> {
-        Binding(
-            get: { activeSource == source },
-            set: { if !$0 { activeSource = nil } }
-        )
-    }
+    // MARK: - Toolbar
 
-    private var Toolbar: some ToolbarContent {
+    private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             if vm.isStaging {
                 ProgressView()

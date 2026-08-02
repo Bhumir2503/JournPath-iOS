@@ -11,28 +11,43 @@ struct StorageFileCell: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: StorageGridMetrics.labelSpacing) {
                 preview
-                    .aspectRatio(1, contentMode: .fit)  // square, width comes from the column
-                    .frame(maxWidth: .infinity)
+                    .frame(
+                        width: StorageGridMetrics.thumbnailSize,
+                        height: StorageGridMetrics.thumbnailSize
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(alignment: .topTrailing) { statusBadge.padding(5) }
                     .overlay { overlays }
 
-                Text(file.originalName)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .truncationMode(.middle)  // "IMG_…519.HEIC" beats "IMG_75…"
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(file.originalName)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(.primary)
 
-                Text(file.displaySize)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    Text(file.displaySize)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+                }
+                .frame(
+                    width: StorageGridMetrics.thumbnailSize,
+                    height: StorageGridMetrics.labelHeight,
+                    alignment: .topLeading
+                )
             }
+            .frame(
+                width: StorageGridMetrics.thumbnailSize,
+                height: StorageGridMetrics.cellHeight
+            )
         }
         .buttonStyle(.plain)
     }
-
+    
     @ViewBuilder
     private var preview: some View {
         ZStack {

@@ -7,7 +7,8 @@ enum DashboardSheet: String, Identifiable {
 
 struct DashboardSheetView: View {
     let sheet: DashboardSheet
-
+    
+    @Environment(SessionStore.self) private var sessionStore
     @Environment(TripStore.self) private var tripStore
     @Environment(\.dismiss) private var dismiss
     private let tripService = TripService()
@@ -15,7 +16,7 @@ struct DashboardSheetView: View {
     var body: some View {
         switch sheet {
         case .participant: ParticipantsView()
-        case .storage: StorageView()
+        case .storage: StorageView(uid: sessionStore.uid)
         case .expenses: EmptyView()
         case .notes: EmptyView()
         case .itineraryBuilder: EmptyView()

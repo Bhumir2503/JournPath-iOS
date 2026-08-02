@@ -1,66 +1,73 @@
-import FirebaseAuth
 import FirebaseFirestore
 import Foundation
 import Observation
-import SwiftUI
 
 @Observable
+@MainActor
 final class StorageStore {
     let tripId: String
 
-    private var storageListener: ListenerRegistration?
-
+    private(set) var state: LoadState<[StorageFile]> = .idle
     private(set) var files: [StorageFile] = []
-    private(set) var hasLoaded = false
 
-    private func filesRef() -> CollectionReference {
-        Firestore.firestore()
-            .collection("trips")
-            .document(tripId)
-            .collection("files")
-    }
+    @ObservationIgnored private var listener: ListenerRegistration?
 
-    init(tripId: String) {
+    private let db: Firestore
+
+    init(tripId: String, db: Firestore = .firestore()) {
         self.tripId = tripId
+        self.db = db
     }
 
+    /// `remove()` isn't actor-isolated, so this is safe from a @MainActor deinit.
     deinit {
-        storageListener?.remove()
+        listener?.remove()
     }
 
     func start() {
-        guard !tripId.isEmpty else { return }
-        startStorageListener()
-    }
+        guard !tripId.isEmpty, listener == nil else { return }
+        state = .loading
 
-    private func startStorageListener() {
-        guard storageListener == nil else { return }
+        AppLogger.store.info("[StorageStore] start \(self.tripId)")
 
-        AppLogger.store.info("[StorageStore] Started listening to files in trip: \(self.tripId)")
-
-        storageListener = filesRef()
+        listener = db.collection("trips").document(tripId).collection("files")
+            .order(by: "clientCreatedAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-
-                if let error {
-                    AppLogger.store.error("[StorageStore] Storage listener failed: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let snapshot else {
-                    self.files = []
-                    self.hasLoaded = true
-                    return
-                }
-
-                self.files = snapshot.documents.compactMap { try? $0.data(as: StorageFile.self) }
-                self.hasLoaded = true
+                MainActor.assumeIsolated { self?.handle(snapshot, error) }
             }
     }
 
     func stop() {
-        AppLogger.store.info("[StorageStore] Stopped listening to files in trip: \(self.tripId)")
-        storageListener?.remove()
-        storageListener = nil
+        AppLogger.store.info("[StorageStore] stop \(self.tripId)")
+        listener?.remove()
+        listener = nil
+    }
+
+    func retry() {
+        stop()
+        state = .idle
+        start()
+    }
+
+    private func handle(_ snapshot: QuerySnapshot?, _ error: Error?) {
+        if let error {
+            AppLogger.store.error("[StorageStore] listener: \(error.localizedDescription)")
+            state = .failed(AnyAppError("Error", "Error loading files"))
+            return
+        }
+        guard let documents = snapshot?.documents else { return }
+
+        var decoded: [StorageFile] = []
+        for document in documents {
+            do {
+                decoded.append(try document.data(as: StorageFile.self))
+            } catch {
+                // Logged rather than dropped by `try?` — a schema drift shows
+                // up as a missing file, which is near-impossible to debug.
+                AppLogger.store.error("[StorageStore] decode \(document.documentID): \(error.localizedDescription)")
+            }
+        }
+        files = decoded
+        state = .loaded(decoded)
     }
 }
