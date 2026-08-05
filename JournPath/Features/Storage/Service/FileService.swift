@@ -61,7 +61,7 @@ struct FileService {
 
     func delete(tripId: String, fileId: String) async throws {
         try await ref(tripId).document(fileId).delete()
-        FileCache.discard(id: fileId)
+        FileUploadCache.discard(id: fileId)
         FileDownloadCache.remove(fileId: fileId, tripId: tripId)
     }
 
@@ -69,7 +69,7 @@ struct FileService {
         let batch = db.batch()
         for fileId in fileIds {
             batch.deleteDocument(ref(tripId).document(fileId))
-            FileCache.discard(id: fileId)
+            FileUploadCache.discard(id: fileId)
             FileDownloadCache.remove(fileId: fileId, tripId: tripId)
         }
         try await batch.commit()

@@ -78,12 +78,12 @@ final class UploadManager {
             guard let fileId = file.id, !inFlight.contains(fileId) else { continue }
 
             // Bytes gone — app reinstalled, or the cache was pruned.
-            guard FileCache.exists(fileId) else {
+            guard FileUploadCache.exists(fileId) else {
                 AppLogger.store.error("[UploadManager] missing local bytes for \(fileId)")
                 Task {
                     try? await files.delete(tripId: tripId, fileId: fileId)
                 }
-                FileCache.discard(id: fileId) 
+                FileUploadCache.discard(id: fileId) 
                 continue
             }
 
@@ -107,11 +107,12 @@ final class UploadManager {
             }
 
             try await storage.upload(
-                localURL: FileCache.path(for: fileId),
+                localURL: FileUploadCache.path(for: fileId),
                 to: path,
                 contentType: file.mimeType
             ) { [weak self] fraction in
-                Task { @MainActor in self?.uploadProgress[fileId] = fraction }
+                guard let self else { return }
+                Task { @MainActor in self.uploadProgress[fileId] = fraction }
             }
 
             // processUpload owns `uploaded`, storagePath, and thumbnailPath.
@@ -120,7 +121,7 @@ final class UploadManager {
         } catch {
             AppLogger.store.error("[UploadManager] \(fileId) failed: \(error.localizedDescription)")
             //clear and delete file
-            FileCache.discard(id: fileId)
+            FileUploadCache.discard(id: fileId)
             try? await files.delete(tripId: tripId, fileId: fileId)
         }
     }

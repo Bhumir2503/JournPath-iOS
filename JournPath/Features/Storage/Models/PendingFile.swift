@@ -1,3 +1,4 @@
+import FirebaseFirestore
 import Foundation
 import UniformTypeIdentifiers
 
@@ -20,11 +21,27 @@ struct PendingFile: Identifiable, Hashable, Sendable {
     let byteSize: Int  // known locally, before upload
     let kind: FileKind
     let pickedAt: Date
-}
 
-extension PendingFile {
     var fileExtension: String {
         UTType(mimeType: mimeType)?.preferredFilenameExtension ?? "dat"
     }
     var isImage: Bool { mimeType.hasPrefix("image/") }
+
+    func makeFileDoc(parentType: ParentType, parentId: String, uid: String) -> [String: Any] {
+        [
+            "kind": kind.rawValue,
+            "originalName": originalName,
+            "mimeType": mimeType,
+            "byteSize": byteSize,
+            "uploadedBy": uid,
+            "parentType": parentType.rawValue,
+            "parentId": parentId,
+            "clientCreatedAt": Timestamp(date: pickedAt),
+            "status": FileStatus.pending.rawValue,
+            "quotaRejected": false,
+            "uploadAttempts": 0,
+            "createdAt": FieldValue.serverTimestamp(),
+            "updatedAt": FieldValue.serverTimestamp(),
+        ]
+    }
 }

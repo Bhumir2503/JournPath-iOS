@@ -98,7 +98,7 @@ struct TripDashboardContent: View {
     /// Purges caches when kicked out of a trip
     private func purgeCaches() {
         let ids = storageStore.liveFileIds(uid: session.uid)
-        ids.forEach { FileCache.discard(id: $0) }
+        ids.forEach { FileUploadCache.discard(id: $0) }
         FileDownloadCache.purge(tripId: tripStore.tripId)
         activeSheet = nil
     }

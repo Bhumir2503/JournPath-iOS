@@ -72,9 +72,9 @@
 
     // MARK: - Scanner
 
-    enum ContainerScanner {
+    enum ContainerScanner: Sendable {
         private static let keys: [URLResourceKey] = [
-            .isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey, .contentModificationDateKey,
+            .isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey, .contentModificationDateKey
         ]
 
         /// Immediate children, with recursive sizes for directories.
@@ -107,7 +107,7 @@
         }
 
         /// Total bytes and file count beneath a directory.
-        static func measure(_ directory: URL) -> (bytes: Int64, files: Int) {
+        nonisolated static func measure(_ directory: URL) -> (bytes: Int64, files: Int) {
             guard
                 let enumerator = FileManager.default.enumerator(
                     at: directory,
@@ -394,7 +394,7 @@
         private var hazard: String? {
             let path = url.standardizedFileURL.path
 
-            if path == FileCache.uploadsDir.standardizedFileURL.path {
+            if path == FileUploadCache.uploadsDir.standardizedFileURL.path {
                 return "Staged uploads that haven't finished will be lost. Their file docs will point at bytes that no longer exist, and those uploads can't be retried."
             }
             if path.localizedCaseInsensitiveContains("firestore") {
@@ -536,13 +536,10 @@
                 }
                 // Binary: hex dump the first 128 bytes. Magic numbers are usually
                 // enough — FFD8FF is JPEG, 25504446 is %PDF, 89504E47 is PNG.
-                return data.prefix(128)
-                    .map { String(format: "%02X", $0) }
-                    .chunked(into: 2)
-                    .map { $0.joined() }
-                    .chunked(into: 16)
-                    .map { $0.joined(separator: " ") }
-                    .joined(separator: "\n")
+                let hexStrings = data.prefix(128).map { String(format: "%02X", $0) }
+                let pairs = hexStrings.chunked(into: 2).map { $0.joined() }
+                let lines = pairs.chunked(into: 16).map { $0.joined(separator: " ") }
+                return lines.joined(separator: "\n")
             }.value
         }
     }

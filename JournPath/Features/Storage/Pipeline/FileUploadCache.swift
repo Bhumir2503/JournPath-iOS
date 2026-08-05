@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 ///
 /// Threading: synchronous file I/O, and image staging delegates to
 /// MediaCompressor. Call from a detached task, never from the main actor.
-enum FileCache {
+enum FileUploadCache {
 
     // MARK: - Configuration
 
@@ -19,6 +19,7 @@ enum FileCache {
     static let uploadsDir: URL = {
         var dir = URL.applicationSupportDirectory
             .appending(path: "uploads", directoryHint: .isDirectory)
+
 
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
@@ -46,7 +47,7 @@ enum FileCache {
 
     /// For `.fileImporter` results, which are security-scoped.
     /// Images are downsampled and re-encoded as JPEG; everything else is copied.
-    static func stage(copying sourceURL: URL, kind: FileKind) throws -> PendingFile {
+    static func stage(copying sourceURL: URL, kind: FileKind) async throws -> PendingFile {
         let scoped = sourceURL.startAccessingSecurityScopedResource()
         defer { if scoped { sourceURL.stopAccessingSecurityScopedResource() } }
 
@@ -88,7 +89,7 @@ enum FileCache {
 
     /// For camera captures, scans, and PhotosPicker payloads.
     /// Image data is downsampled; PDF and other data is written as-is.
-    static func stage(data: Data, originalName: String, mimeType: String, kind: FileKind) throws -> PendingFile {
+    static func stage(data: Data, originalName: String, mimeType: String, kind: FileKind) async throws -> PendingFile {
         guard data.count <= maxSourceBytes else {
             throw CacheError.tooLarge(limit: maxSourceBytes)
         }
@@ -142,7 +143,9 @@ enum FileCache {
     }
 
     static func discardAll(_ files: [PendingFile]) {
-        files.forEach(discard)
+        files.forEach {
+            discard($0)
+        }
     }
 
     /// Total bytes currently staged. Worth surfacing in settings once trips

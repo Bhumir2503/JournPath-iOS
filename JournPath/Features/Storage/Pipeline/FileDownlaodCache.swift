@@ -1,9 +1,9 @@
 import Foundation
 
-/// Files downloaded for viewing. Distinct from `FileCache`, which stages
+/// Files downloaded for viewing. Distinct from `FileUploadCache`, which stages
 /// bytes awaiting upload:
 ///
-/// | | FileCache | FileDownloadCache |
+/// | | FileUploadCache | FileDownloadCache |
 /// |---|---|---|
 /// | Location | Application Support | Caches |
 /// | Losing it means | user loses their photo | one re-download |
@@ -31,15 +31,7 @@ enum FileDownloadCache {
 
     // MARK: - Read / write
 
-    static func isCached(_ file: StorageFile, tripId: String, currentUid: String?) -> Bool {
-        guard let id = file.id else { return false }
-
-        // The uploader still has the original staged in FileCache until
-        // pruning runs — no reason to re-download their own file.
-        if let currentUid, file.uploadedBy == currentUid, FileCache.exists(id) {
-            return true
-        }
-
+    static func isCached(_ file: StorageFile, tripId: String) -> Bool {
         return cached(file, tripId: tripId) != nil
     }
 

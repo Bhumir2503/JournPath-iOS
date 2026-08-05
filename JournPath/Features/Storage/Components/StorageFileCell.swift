@@ -6,7 +6,6 @@ struct StorageFileCell: View {
     @Environment(StorageStore.self) private var storage
     
     let file: StorageFile
-    let currentUid: String?
     let progress: Double?
     
     @Binding var isSelecting: Bool
@@ -28,7 +27,7 @@ struct StorageFileCell: View {
                 if !isCached && !isDownloading && file.status == .uploaded {
                     downloadFile()
                 } else if isCached {
-                    previewURL = FileDownloadCache.cached(file, tripId: storage.tripId) ?? file.localPath(currentUid: currentUid)
+                    previewURL = FileDownloadCache.cached(file, tripId: storage.tripId)
                 }
             }
         }) {
@@ -122,7 +121,7 @@ struct StorageFileCell: View {
         }
         .quickLookPreview($previewURL)
         .task(id: file.status) {
-            isCached = FileDownloadCache.isCached(file, tripId: storage.tripId, currentUid: currentUid)
+            isCached = FileDownloadCache.isCached(file, tripId: storage.tripId)
         }
     }
     

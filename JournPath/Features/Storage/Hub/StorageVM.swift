@@ -36,7 +36,7 @@ final class StorageVM {
         Task {
             await stageAll(tripId: tripId, count: urls.count, quota: quota) { index in
                 let url = urls[index]
-                return try await Self.offMain { try FileCache.stage(copying: url, kind: .document) }
+                return try await Self.offMain { try await FileUploadCache.stage(copying: url, kind: .document) }
             }
         }
     }
@@ -52,13 +52,13 @@ final class StorageVM {
             let name = "Photo.\(type?.preferredFilenameExtension ?? "jpg")"
             let mime = type?.preferredMIMEType ?? "image/jpeg"
             return try await Self.offMain {
-                try FileCache.stage(data: data, originalName: name, mimeType: mime, kind: .photo)
+                try await FileUploadCache.stage(data: data, originalName: name, mimeType: mime, kind: .photo)
             }
         }
     }
 
     /// Camera capture. Hand over the least-processed data available —
-    /// FileCache downsamples, and pre-compressing here stacks artifacts.
+    /// FileUploadCache downsamples, and pre-compressing here stacks artifacts.
     func stage(image: UIImage, tripId: String, quota: QuotaContext) {
         guard let data = image.jpegData(compressionQuality: 1.0) else { return }
         let name = "Photo \(Date.now.formatted(date: .abbreviated, time: .shortened)).jpg"
@@ -66,7 +66,7 @@ final class StorageVM {
         Task {
             await stageAll(tripId: tripId, count: 1, quota: quota) { _ in
                 try await Self.offMain {
-                    try FileCache.stage(
+                    try await FileUploadCache.stage(
                         data: data, originalName: name,
                         mimeType: "image/jpeg", kind: .photo)
                 }
@@ -83,7 +83,7 @@ final class StorageVM {
             await stageAll(tripId: tripId, count: 1, quota: quota) { _ in
                 try await Self.offMain {
                     let pdf = try MediaCompressor.makePDF(from: pages)
-                    return try FileCache.stage(
+                    return try await FileUploadCache.stage(
                         data: pdf, originalName: "Scan.pdf",
                         mimeType: "application/pdf", kind: .scan)
                 }
@@ -121,7 +121,7 @@ final class StorageVM {
 
                 let projected = quota.usedBytes + quota.inFlightBytes + batchBytes + pending.byteSize
                 guard projected <= quota.limitBytes else {
-                    FileCache.discard(pending)
+                    FileUploadCache.discard(pending)
                     // present(
                     //     StagingError.quotaExceeded(
                     //         remaining: max(0, quota.limitBytes - quota.usedBytes - quota.inFlightBytes - batchBytes)
@@ -136,7 +136,7 @@ final class StorageVM {
                     batchBytes += pending.byteSize
                 } catch {
                     // No doc means nothing will ever claim these bytes.
-                    FileCache.discard(pending)
+                    FileUploadCache.discard(pending)
                     throw error
                 }
             } catch {
@@ -147,9 +147,11 @@ final class StorageVM {
 
     /// Compression and file I/O are CPU-bound — keep them off the main actor.
     private static func offMain<T: Sendable>(
-        _ work: @escaping @Sendable () throws -> T
+        _ work: @escaping @Sendable () async throws -> T
     ) async throws -> T {
-        try await Task.detached(priority: .userInitiated, operation: work).value
+        try await Task.detached(priority: .userInitiated) {
+            try await work()
+        }.value
     }
 
     // MARK: - Types

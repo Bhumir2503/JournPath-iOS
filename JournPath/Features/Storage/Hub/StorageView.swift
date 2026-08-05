@@ -3,7 +3,6 @@ import SwiftUI
 
 struct StorageView: View {
     @Environment(TripStore.self) private var tripStore
-    @Environment(SessionStore.self) private var session
     @Environment(StorageStore.self) private var store
     @Environment(UploadManager.self) private var uploads
 
@@ -100,7 +99,6 @@ struct StorageView: View {
                 ScrollView {
                     StorageGrid(
                         files: store.uploadedFiles,
-                        currentUid: session.uid,
                         progress: uploads.progress(for:),
                         isSelecting: $isSelecting,
                         selectedFileIds: $selectedFileIds
@@ -108,7 +106,7 @@ struct StorageView: View {
                     .padding(.vertical, 12)
                 }
                 .scrollIndicators(.hidden)
-                .safeAreaInset(edge: .bottom) { 
+                .safeAreaInset(edge: .bottom) {
                     UploadTray()
                 }
             }

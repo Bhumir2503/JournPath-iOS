@@ -1,5 +1,6 @@
 import FirebaseFirestore
 import Foundation
+import UniformTypeIdentifiers
 
 enum FileStatus: String, Codable, Sendable {
     case pending, uploading, uploaded, failed
@@ -7,6 +8,10 @@ enum FileStatus: String, Codable, Sendable {
 
 enum ParentType: String, Codable, Sendable {
     case trip, itineraryItem, expense
+}
+
+enum AttachmentKind: String, Codable, Sendable {
+    case photo, document, scan
 }
 
 struct StorageFile: Identifiable, Codable, Hashable, Sendable {
@@ -40,4 +45,24 @@ struct StorageFile: Identifiable, Codable, Hashable, Sendable {
 
     @ServerTimestamp var createdAt: Date?
     @ServerTimestamp var updatedAt: Date?
+
+    var fileExtension: String {
+        UTType(mimeType: mimeType)?.preferredFilenameExtension ?? "dat"
+    }
+    var isImage: Bool { mimeType.hasPrefix("image/") }
+    var isReady: Bool { status == .uploaded && storagePath != nil }
+    var isInFlight: Bool { status == .pending || status == .uploading }
+
+    var displaySize: String {
+        ByteCountFormatter.string(fromByteCount: Int64(byteSize), countStyle: .file)
+    }
+
+    var systemImageName: String {
+        if isImage { return "photo" }
+        if mimeType == "application/pdf" { return "doc.richtext" }
+        switch kind {
+        case .scan: return "doc.text.viewfinder"
+        case .document, .photo: return "doc.fill"
+        }
+    }
 }

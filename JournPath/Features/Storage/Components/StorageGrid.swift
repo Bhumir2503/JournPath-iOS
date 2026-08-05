@@ -3,7 +3,6 @@ import SwiftUI
 
 struct StorageGrid: View {
     let files: [StorageFile]
-    let currentUid: String?
     let progress: (String) -> Double?
     
     @Binding var isSelecting: Bool
@@ -24,7 +23,6 @@ struct StorageGrid: View {
             ForEach(files) { file in
                 StorageFileCell(
                     file: file,
-                    currentUid: currentUid,
                     progress: file.id.flatMap(progress),
                     isSelecting: $isSelecting,
                     isSelected: Binding(

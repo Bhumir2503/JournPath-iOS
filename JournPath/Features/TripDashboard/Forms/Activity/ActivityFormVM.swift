@@ -22,7 +22,6 @@ final class ActivityFormVM {
     var note: String = ""
 
     // Storage Section
-    var pendingAttachments: [PendingAttachment] = []
 
     // Service
     let service = ItineraryService()
