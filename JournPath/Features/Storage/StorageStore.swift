@@ -39,6 +39,11 @@ final class StorageStore {
         files.filter(\.isInFlight).reduce(0) { $0 + $1.byteSize }
     }
 
+    var usedBytes: Int {
+        files.filter { $0.status == .uploaded }
+            .reduce(0) { $0 + $1.byteSize }
+    }
+
     var uploadedFiles: [StorageFile] {
         files.filter { $0.status == .uploaded }
     }
@@ -131,16 +136,6 @@ final class StorageStore {
             let fileId = change.document.documentID
 
             switch change.type {
-            case .modified:
-                guard let uid,
-                    let file = try? change.document.data(as: StorageFile.self),
-                    file.status == .uploaded,
-                    file.uploadedBy == uid,
-                    FileUploadCache.exists(fileId)
-                else { continue }
-
-                AppLogger.store.info("[StorageStore] discarding staged bytes for \(fileId)")
-                FileUploadCache.discard(id: fileId)
 
             case .removed:
                 // Decode the last-known state to get the extension; if it fails,
@@ -152,7 +147,7 @@ final class StorageStore {
                 }
                 FileUploadCache.discard(id: fileId)  // in case it never uploaded
 
-            case .added:
+            case .added, .modified:
                 continue
             }
         }

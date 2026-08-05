@@ -18,6 +18,16 @@ final class UploadManager {
     private let files = FileService.shared
     private let storage = StorageService.shared
 
+    private(set) var failureNotices: [String: FailureNotice] = [:]
+
+    struct FailureNotice: Identifiable {
+        let id: String  // fileId
+        let fileName: String
+        let message: String
+    }
+
+    var hasFailures: Bool { !failureNotices.isEmpty }
+
     init(db: Firestore = .firestore()) {
         self.db = db
     }
@@ -37,6 +47,7 @@ final class UploadManager {
         AppLogger.store.info("[UploadManager] watching queue for trip \(tripId)")
 
         queueListener = db.collection("trips").document(tripId).collection("files")
+            .whereField("deviceId", isEqualTo: DeviceID.current)
             .whereField("uploadedBy", isEqualTo: uid)
             .whereField(
                 "status",
@@ -66,10 +77,14 @@ final class UploadManager {
             AppLogger.store.error("[UploadManager] queue listener: \(error.localizedDescription)")
             return
         }
-        guard let documents = snapshot?.documents else { return }
+        guard let snapshot = snapshot else { return }
+
+        for change in snapshot.documentChanges where change.type == .removed {
+            FileUploadCache.discard(id: change.document.documentID)
+        }
 
         let queued =
-            documents
+            snapshot.documents
             .compactMap { try? $0.data(as: StorageFile.self) }
             .sorted { $0.clientCreatedAt < $1.clientCreatedAt }
 
@@ -80,10 +95,8 @@ final class UploadManager {
             // Bytes gone — app reinstalled, or the cache was pruned.
             guard FileUploadCache.exists(fileId) else {
                 AppLogger.store.error("[UploadManager] missing local bytes for \(fileId)")
-                Task {
-                    try? await files.delete(tripId: tripId, fileId: fileId)
-                }
-                FileUploadCache.discard(id: fileId) 
+                noteFailure(file, tripId: tripId, fileId: fileId, message: "File no longer available on this device")
+                FileUploadCache.discard(id: fileId)
                 continue
             }
 
@@ -117,12 +130,30 @@ final class UploadManager {
 
             // processUpload owns `uploaded`, storagePath, and thumbnailPath.
             AppLogger.store.info("[UploadManager] uploaded \(fileId), awaiting processUpload")
-
         } catch {
             AppLogger.store.error("[UploadManager] \(fileId) failed: \(error.localizedDescription)")
-            //clear and delete file
+            noteFailure(file, tripId: tripId, fileId: fileId, message: "Upload failed. Try adding it again.")
+            //clear
             FileUploadCache.discard(id: fileId)
-            try? await files.delete(tripId: tripId, fileId: fileId)
         }
+    }
+
+    private func noteFailure(_ file: StorageFile, tripId: String, fileId: String, message: String) {
+        failureNotices[fileId] = FailureNotice(
+            id: fileId,
+            fileName: file.originalName,
+            message: message
+        )
+
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            try? await files.delete(tripId: tripId, fileId: fileId)
+            failureNotices[fileId] = nil
+        }
+    }
+
+    func dismissFailure(_ fileId: String, tripId: String) async {
+        failureNotices[fileId] = nil
+        try? await files.delete(tripId: tripId, fileId: fileId)
     }
 }

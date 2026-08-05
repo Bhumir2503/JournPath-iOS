@@ -4,16 +4,9 @@ struct StorageQuotaBar: View {
     @Environment(TripStore.self) private var tripStore
     @Environment(StorageStore.self) private var storageStore
 
-    /// The server counter only reflects files processUpload has finished, so
-    /// in-flight bytes are added here — otherwise a 20-photo import shows 0%
-    /// used right up until it blows the quota.
-    private var usedBytes: Int {
-        tripStore.trip?.storageUsedBytes ?? 0
-    }
-
     private var fraction: Double {
         guard let quota = tripStore.trip?.storageQuota, quota > 0 else { return 0 }
-        return min(1, Double(usedBytes) / Double(quota))
+        return min(1, Double(storageStore.usedBytes) / Double(quota))
     }
 
     private var tint: Color {
@@ -33,7 +26,7 @@ struct StorageQuotaBar: View {
                         .foregroundStyle(tint)
                 }
                 Spacer()
-                Text("\(format(usedBytes)) of \(format(tripStore.trip?.storageQuota ?? 10 * 1024 * 1024))")
+                Text("\(format(storageStore.usedBytes)) of \(format(tripStore.trip?.storageQuota ?? 10 * 1024 * 1024))")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()

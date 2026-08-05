@@ -26,6 +26,7 @@ struct StorageFile: Identifiable, Codable, Hashable, Sendable {
     var parentType: ParentType  // .itineraryItem, .expense, .trip
     var parentId: String
     var clientCreatedAt: Date  // from PendingAttachment.pickedAt
+    var deviceId: String
 
     // ---- Upload state: client writes pending/uploading/failed ----
     var status: FileStatus

@@ -34,6 +34,7 @@ struct PendingFile: Identifiable, Hashable, Sendable {
             "mimeType": mimeType,
             "byteSize": byteSize,
             "uploadedBy": uid,
+            "deviceId": DeviceID.current,
             "parentType": parentType.rawValue,
             "parentId": parentId,
             "clientCreatedAt": Timestamp(date: pickedAt),

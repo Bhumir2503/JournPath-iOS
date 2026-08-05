@@ -14,7 +14,7 @@ final class StorageVM {
     /// so the count drives a toolbar spinner.
     private(set) var stagingCount = 0
 
-    var errorMessage: String?
+    var errorMessage: String? = nil
     var showingError = false
 
     var isStaging: Bool { stagingCount > 0 }
@@ -82,7 +82,7 @@ final class StorageVM {
         Task {
             await stageAll(tripId: tripId, count: 1, quota: quota) { _ in
                 try await Self.offMain {
-                    let pdf = try MediaCompressor.makePDF(from: pages)
+                    let pdf = try await MediaCompressor.makePDF(from: pages)
                     return try await FileUploadCache.stage(
                         data: pdf, originalName: "Scan.pdf",
                         mimeType: "application/pdf", kind: .scan)
@@ -103,7 +103,6 @@ final class StorageVM {
         produce: (Int) async throws -> PendingFile
     ) async {
         guard let uid else {
-            // present(StagingError.notSignedIn)
             return
         }
 
@@ -114,6 +113,8 @@ final class StorageVM {
         // yet, so `quota.inFlightBytes` doesn't see them. Track them here or
         // every file in a 20-photo import checks against the same stale number.
         var batchBytes = 0
+        var setError = false
+        var errorCount = 0
 
         for index in 0..<count {
             do {
@@ -121,12 +122,10 @@ final class StorageVM {
 
                 let projected = quota.usedBytes + quota.inFlightBytes + batchBytes + pending.byteSize
                 guard projected <= quota.limitBytes else {
+                    setError = true
+                    errorCount += 1
                     FileUploadCache.discard(pending)
-                    // present(
-                    //     StagingError.quotaExceeded(
-                    //         remaining: max(0, quota.limitBytes - quota.usedBytes - quota.inFlightBytes - batchBytes)
-                    //     ))
-                    return  // stop the batch — the rest won't fit either
+                    continue
                 }
 
                 do {
@@ -135,14 +134,18 @@ final class StorageVM {
                         parentType: .trip, parentId: tripId, uid: uid)
                     batchBytes += pending.byteSize
                 } catch {
-                    // No doc means nothing will ever claim these bytes.
                     FileUploadCache.discard(pending)
                     throw error
                 }
             } catch {
-                // present(error)  // per-file: one bad pick doesn't kill the rest
+                AppLogger.viewModels.error("Error staging file: \(error)")
             }
         }
+
+        if setError {
+            errorMessage = "Storage limit reached. \(errorCount) files were not uploaded. Please delete some files and try again."
+        }
+        showingError = setError
     }
 
     /// Compression and file I/O are CPU-bound — keep them off the main actor.

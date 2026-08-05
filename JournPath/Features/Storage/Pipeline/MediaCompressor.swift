@@ -86,7 +86,7 @@ enum MediaCompressor {
 
     /// Renders scanned pages into a single Letter-sized PDF, fitting each page
     /// to the sheet rather than drawing at native camera resolution.
-    static func makePDF(from images: [CGImage]) throws -> Data {
+    static func makePDF(from images: [CGImage]) async throws -> Data {
         guard !images.isEmpty else { throw CompressionError.emptyInput }
 
         var pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)  // Letter @ 72dpi

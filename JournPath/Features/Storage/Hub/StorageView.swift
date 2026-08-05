@@ -48,16 +48,16 @@ struct StorageView: View {
                         onError: { _ in print("Error") }
                     )
                 )
-                .alert("Something went wrong", isPresented: $vm.showingError) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text(vm.errorMessage ?? "")
-                }
                 .alert("Delete \(selectedFileIds.count) files?", isPresented: $showingBulkDeleteConfirm) {
                     Button("Delete", role: .destructive) { bulkDeleteSelected() }
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text("This action cannot be undone.")
+                }
+                .alert("Error", isPresented: $vm.showingError) {
+                    Button("OK") {}
+                } message: {
+                    Text(vm.errorMessage ?? "Something went wrong.")
                 }
             // .sheet(item: $selected) { file in
             //     FileDetailView(file: file)
@@ -118,46 +118,46 @@ struct StorageView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
+            HStack {
+                Menu {
+                    ForEach(FilePickerSource.allCases) { source in
+                        Button {
+                            activeSource = source
+                        } label: {
+                            Label(source.title, systemImage: source.systemImage)
+                        }
+                    }
+                } label: {
+                    Label("Add", systemImage: "plus")
+                }
+            }
+
+        }
+
+        ToolbarItem(placement: .navigationBarLeading) {
             if isSelecting {
                 Button("Cancel") {
                     isSelecting = false
                     selectedFileIds.removeAll()
                 }
-            } else if vm.isStaging {
-                ProgressView()
-            } else {
-                HStack {
-                    if !store.uploadedFiles.isEmpty {
-                        Button("Select") {
-                            isSelecting = true
-                        }
-                    }
-                    Menu {
-                        ForEach(FilePickerSource.allCases) { source in
-                            Button {
-                                activeSource = source
-                            } label: {
-                                Label(source.title, systemImage: source.systemImage)
-                            }
-                        }
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                    }
+            } else if !store.uploadedFiles.isEmpty {
+                Button("Select") {
+                    isSelecting = true
                 }
             }
         }
 
         if isSelecting {
+            ToolbarSpacer(placement: .bottomBar)
             ToolbarItem(placement: .bottomBar) {
-                HStack {
-                    Spacer()
-                    Button(role: .destructive) {
-                        showingBulkDeleteConfirm = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .disabled(selectedFileIds.isEmpty)
+                Button {
+                    showingBulkDeleteConfirm = true
+                } label: {
+                    Image(systemName: "trash")
                 }
+                .buttonStyle(.glassProminent)
+                .tint(.red)
+                .disabled(selectedFileIds.isEmpty)
             }
         } else {
             ToolbarItem(placement: .bottomBar) {

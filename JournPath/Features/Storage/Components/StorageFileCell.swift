@@ -45,12 +45,6 @@ struct StorageFileCell: View {
                                 .padding(8)
                         }
                     }
-                    .overlay {
-                        if isSelecting && isSelected {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(.blue, lineWidth: 3)
-                        }
-                    }
 
                 VStack(alignment: .center, spacing: 1) {
                     Text(file.originalName)
