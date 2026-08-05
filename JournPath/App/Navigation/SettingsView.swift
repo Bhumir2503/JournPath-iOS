@@ -20,6 +20,9 @@ struct SettingsView: View {
             profileHeader
             accountAndSecurity
             support
+            #if DEBUG
+                developerSection
+            #endif
             logoutButton
         }
         .scrollIndicators(.hidden)
@@ -155,6 +158,18 @@ extension SettingsView {
         }
     }
 }
+
+// MARK - Developer Section
+#if DEBUG
+    extension SettingsView {
+        @ViewBuilder
+        var developerSection: some View {
+            Section(header: Text("Developer")) {
+                NavigationLink("Cache Inspector") { ContainerBrowserView() }
+            }
+        }
+    }
+#endif
 
 // MARK: - Logout Button
 extension SettingsView {

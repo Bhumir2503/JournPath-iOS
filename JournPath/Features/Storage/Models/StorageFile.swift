@@ -29,7 +29,9 @@ struct StorageFile: Identifiable, Codable, Hashable, Sendable {
 
     // ---- Server-owned, written by processUpload ----
     var storagePath: String?
+    var originalURL: String?
     var thumbnailPath: String?
+    var thumbnailURL: String?
     var width: Int?
     var height: Int?
     var durationSeconds: Double?

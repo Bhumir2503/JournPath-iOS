@@ -2,6 +2,7 @@ import PhotosUI
 import SwiftUI
 
 struct StorageView: View {
+    @Environment(TripStore.self) private var tripStore
     @Environment(SessionStore.self) private var session
     @Environment(StorageStore.self) private var store
     @Environment(UploadManager.self) private var uploads
@@ -10,6 +11,19 @@ struct StorageView: View {
     @State private var activeSource: FilePickerSource?
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var selected: StorageFile?
+
+    @State private var isSelecting = false
+    @State private var selectedFileIds: Set<String> = []
+    @State private var showingBulkDeleteConfirm = false
+
+    // StorageView
+    private var quota: StorageVM.QuotaContext {
+        .init(
+            usedBytes: tripStore.trip?.storageUsedBytes ?? 0,
+            inFlightBytes: store.inFlightBytes,
+            limitBytes: tripStore.trip?.storageQuota ?? 10 * 1024 * 1024
+        )
+    }
 
     /// Constructed here rather than in `.task` — construction is pure, and
     /// rebuilding on every reappearance would drop the resolved thumbnails.
@@ -24,18 +38,14 @@ struct StorageView: View {
                 .navigationTitle("Storage Hub")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
-                .task { await vm.resolveThumbnails(for: store.files) }
-                .onChange(of: store.files.compactMap(\.thumbnailPath).count) { _, _ in
-                    Task { await vm.resolveThumbnails(for: store.files) }
-                }
                 .modifier(
                     FilePickers(
                         activeSource: $activeSource,
                         photoItems: $photoItems,
-                        onFiles: { vm.stage($0, tripId: store.tripId) },
-                        onPhotos: { await vm.stage(photos: $0, tripId: store.tripId) },
-                        onImage: { vm.stage(image: $0, tripId: store.tripId) },
-                        onScan: { vm.stage(scan: $0, tripId: store.tripId) },
+                        onFiles: { vm.stage($0, tripId: store.tripId, quota: quota) },
+                        onPhotos: { await vm.stage(photos: $0, tripId: store.tripId, quota: quota) },
+                        onImage: { vm.stage(image: $0, tripId: store.tripId, quota: quota) },
+                        onScan: { vm.stage(scan: $0, tripId: store.tripId, quota: quota) },
                         onError: { _ in print("Error") }
                     )
                 )
@@ -44,9 +54,15 @@ struct StorageView: View {
                 } message: {
                     Text(vm.errorMessage ?? "")
                 }
-                // .sheet(item: $selected) { file in
-                //     FileDetailView(file: file)
-                // }
+                .alert("Delete \(selectedFileIds.count) files?", isPresented: $showingBulkDeleteConfirm) {
+                    Button("Delete", role: .destructive) { bulkDeleteSelected() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This action cannot be undone.")
+                }
+            // .sheet(item: $selected) { file in
+            //     FileDetailView(file: file)
+            // }
         }
     }
 
@@ -55,7 +71,6 @@ struct StorageView: View {
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 0) {
-
 
             switch store.state {
             case .idle, .loading:
@@ -69,8 +84,6 @@ struct StorageView: View {
                     Label("Couldn't load files", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(error.localizedDescription)
-                } actions: {
-                    Button("Retry") { store.retry() }
                 }
                 Spacer()
 
@@ -86,14 +99,18 @@ struct StorageView: View {
             case .loaded:
                 ScrollView {
                     StorageGrid(
-                        files: store.files,
+                        files: store.uploadedFiles,
                         currentUid: session.uid,
-                        thumbnailURL: vm.thumbnailURL(for:),
                         progress: uploads.progress(for:),
+                        isSelecting: $isSelecting,
+                        selectedFileIds: $selectedFileIds
                     )
                     .padding(.vertical, 12)
                 }
                 .scrollIndicators(.hidden)
+                .safeAreaInset(edge: .bottom) { 
+                    UploadTray()
+                }
             }
         }
     }
@@ -103,25 +120,65 @@ struct StorageView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            if vm.isStaging {
+            if isSelecting {
+                Button("Cancel") {
+                    isSelecting = false
+                    selectedFileIds.removeAll()
+                }
+            } else if vm.isStaging {
                 ProgressView()
             } else {
-                Menu {
-                    ForEach(FilePickerSource.allCases) { source in
-                        Button {
-                            activeSource = source
-                        } label: {
-                            Label(source.title, systemImage: source.systemImage)
+                HStack {
+                    if !store.uploadedFiles.isEmpty {
+                        Button("Select") {
+                            isSelecting = true
                         }
                     }
-                } label: {
-                    Label("Add", systemImage: "plus")
+                    Menu {
+                        ForEach(FilePickerSource.allCases) { source in
+                            Button {
+                                activeSource = source
+                            } label: {
+                                Label(source.title, systemImage: source.systemImage)
+                            }
+                        }
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                    }
                 }
             }
         }
 
-        ToolbarItem(placement: .bottomBar) {
-            StorageQuotaBar()
-        }.sharedBackgroundVisibility(.hidden)
+        if isSelecting {
+            ToolbarItem(placement: .bottomBar) {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        showingBulkDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(selectedFileIds.isEmpty)
+                }
+            }
+        } else {
+            ToolbarItem(placement: .bottomBar) {
+                StorageQuotaBar()
+            }.sharedBackgroundVisibility(.hidden)
+        }
+    }
+
+    private func bulkDeleteSelected() {
+        let idsToDelete = Array(selectedFileIds)
+        Task {
+            do {
+                try await FileService.shared.bulkDelete(tripId: store.tripId, fileIds: idsToDelete)
+                isSelecting = false
+                selectedFileIds.removeAll()
+            } catch {
+                vm.errorMessage = error.localizedDescription
+                vm.showingError = true
+            }
+        }
     }
 }

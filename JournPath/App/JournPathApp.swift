@@ -37,7 +37,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 
         // Configure Kingfisher Cache (Max 500MB disk space)
-        ImageCache.default.diskStorage.config.sizeLimit = 500 * 1024 * 1024
+        ImageCache.default.diskStorage.config.sizeLimit = 100 * 1024 * 1024
 
         return true
     }

@@ -4,8 +4,10 @@ import SwiftUI
 struct StorageGrid: View {
     let files: [StorageFile]
     let currentUid: String?
-    let thumbnailURL: (StorageFile) -> URL?
     let progress: (String) -> Double?
+    
+    @Binding var isSelecting: Bool
+    @Binding var selectedFileIds: Set<String>
 
     private var columns: [GridItem] {
         Array(
@@ -23,8 +25,16 @@ struct StorageGrid: View {
                 StorageFileCell(
                     file: file,
                     currentUid: currentUid,
-                    thumbnailURL: thumbnailURL(file),
                     progress: file.id.flatMap(progress),
+                    isSelecting: $isSelecting,
+                    isSelected: Binding(
+                        get: { file.id.map { selectedFileIds.contains($0) } ?? false },
+                        set: { isSet in 
+                            guard let id = file.id else { return }
+                            if isSet { selectedFileIds.insert(id) } 
+                            else { selectedFileIds.remove(id) }
+                        }
+                    )
                 )
             }
         }

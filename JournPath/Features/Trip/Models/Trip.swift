@@ -30,6 +30,10 @@ struct Trip: Identifiable, Codable, Hashable {
     var createdAt: Date
     var updatedAt: Date?
 
+    /// The storage quota
+    var storageQuota: Int
+    var storageUsedBytes: Int
+
     // Premium Flag
     var tier: TripTier
 

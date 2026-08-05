@@ -12,6 +12,10 @@ struct AnyAppError: LocalizedError {
         self.error = error
     }
 
+    init(_ error: Error) {
+        self.error = error as? LocalizedError ?? CustomStringError(errorDescription: error.localizedDescription, recoverySuggestion: nil)
+    }
+
     init(_ description: String, _ recovery: String) {
         self.error = CustomStringError(errorDescription: description, recoverySuggestion: recovery)
     }

@@ -136,7 +136,7 @@ enum MediaCompressor {
         }
     }
 
-    private static func thumbnail(from source: CGImageSource, maxDimension: CGFloat) -> CGImage? {
+    static func thumbnail(from source: CGImageSource, maxDimension: CGFloat) -> CGImage? {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,  // bakes in EXIF rotation

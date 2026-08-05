@@ -4,11 +4,11 @@ final class TripSession {
     var participants: ParticipantStore
     var storage: StorageStore
 
-    init(tripId: String) {
+    init(tripId: String, uid: String) {
         self.tripId = tripId
         self.trip = TripStore(tripId: tripId)
         self.participants = ParticipantStore(tripId: tripId)
-        self.storage = StorageStore(tripId: tripId)
+        self.storage = StorageStore(tripId: tripId, uid: uid)
     }
 
     deinit {

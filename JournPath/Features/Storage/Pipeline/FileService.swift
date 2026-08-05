@@ -13,8 +13,10 @@ struct FileService {
 
     /// Standalone add (storage hub). Forms use the batch in their own save
     /// so the parent doc and its files land atomically.
-    func addFiles(_ files: [PendingFile], tripId: String, parentType: ParentType,
-                  parentId: String, uid: String) throws {
+    func addFiles(
+        _ files: [PendingFile], tripId: String, parentType: ParentType,
+        parentId: String, uid: String
+    ) throws {
         guard !files.isEmpty else { return }
         let batch = db.batch()
         for file in files {
@@ -23,13 +25,13 @@ struct FileService {
                 forDocument: ref(tripId).document(file.id)
             )
         }
-        batch.commit()          // fire-and-forget: local cache applies immediately
+        batch.commit()  // fire-and-forget: local cache applies immediately
     }
 
     func markUploading(tripId: String, fileId: String) async throws {
         try await ref(tripId).document(fileId).updateData([
             "status": FileStatus.uploading.rawValue,
-            "updatedAt": FieldValue.serverTimestamp()
+            "updatedAt": FieldValue.serverTimestamp(),
         ])
     }
 
@@ -38,7 +40,7 @@ struct FileService {
             "status": FileStatus.failed.rawValue,
             "lastError": error,
             "uploadAttempts": attempts,
-            "updatedAt": FieldValue.serverTimestamp()
+            "updatedAt": FieldValue.serverTimestamp(),
         ])
     }
 
@@ -46,12 +48,30 @@ struct FileService {
         try await ref(tripId).document(fileId).updateData([
             "status": FileStatus.pending.rawValue,
             "lastError": NSNull(),
-            "updatedAt": FieldValue.serverTimestamp()
+            "updatedAt": FieldValue.serverTimestamp(),
+        ])
+    }
+
+    func rename(tripId: String, fileId: String, newName: String) async throws {
+        try await ref(tripId).document(fileId).updateData([
+            "originalName": newName,
+            "updatedAt": FieldValue.serverTimestamp(),
         ])
     }
 
     func delete(tripId: String, fileId: String) async throws {
         try await ref(tripId).document(fileId).delete()
         FileCache.discard(id: fileId)
+        FileDownloadCache.remove(fileId: fileId, tripId: tripId)
+    }
+
+    func bulkDelete(tripId: String, fileIds: [String]) async throws {
+        let batch = db.batch()
+        for fileId in fileIds {
+            batch.deleteDocument(ref(tripId).document(fileId))
+            FileCache.discard(id: fileId)
+            FileDownloadCache.remove(fileId: fileId, tripId: tripId)
+        }
+        try await batch.commit()
     }
 }

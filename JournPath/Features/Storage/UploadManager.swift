@@ -10,7 +10,7 @@ final class UploadManager {
     private var uid: String?
     private var activeTripId: String?
     private var inFlight: Set<String> = []
-    private let maxConcurrent = 2
+    private let maxConcurrent = 3
 
     private var queueListener: ListenerRegistration?
 
@@ -38,8 +38,13 @@ final class UploadManager {
 
         queueListener = db.collection("trips").document(tripId).collection("files")
             .whereField("uploadedBy", isEqualTo: uid)
-            .whereField("status", in: [FileStatus.pending.rawValue,
-                                       FileStatus.uploading.rawValue])
+            .whereField(
+                "status",
+                in: [
+                    FileStatus.pending.rawValue,
+                    FileStatus.uploading.rawValue,
+                ]
+            )
             .addSnapshotListener { [weak self] snapshot, error in
                 self?.handle(snapshot, error, tripId: tripId)
             }
@@ -63,7 +68,8 @@ final class UploadManager {
         }
         guard let documents = snapshot?.documents else { return }
 
-        let queued = documents
+        let queued =
+            documents
             .compactMap { try? $0.data(as: StorageFile.self) }
             .sorted { $0.clientCreatedAt < $1.clientCreatedAt }
 
@@ -75,10 +81,9 @@ final class UploadManager {
             guard FileCache.exists(fileId) else {
                 AppLogger.store.error("[UploadManager] missing local bytes for \(fileId)")
                 Task {
-                    try? await files.markFailed(tripId: tripId, fileId: fileId,
-                                                error: "Local file no longer available",
-                                                attempts: file.uploadAttempts + 1)
+                    try? await files.delete(tripId: tripId, fileId: fileId)
                 }
+                FileCache.discard(id: fileId) 
                 continue
             }
 
@@ -114,9 +119,9 @@ final class UploadManager {
 
         } catch {
             AppLogger.store.error("[UploadManager] \(fileId) failed: \(error.localizedDescription)")
-            try? await files.markFailed(tripId: tripId, fileId: fileId,
-                                        error: error.localizedDescription,
-                                        attempts: file.uploadAttempts + 1)
+            //clear and delete file
+            FileCache.discard(id: fileId)
+            try? await files.delete(tripId: tripId, fileId: fileId)
         }
     }
 }

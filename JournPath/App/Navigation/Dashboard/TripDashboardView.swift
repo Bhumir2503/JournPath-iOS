@@ -21,8 +21,8 @@ struct TripDashboardView: View {
         }
         .background(Color(uiColor: .secondarySystemBackground))
         .task(id: tripId) {
-            guard session?.tripId != tripId else { return }   // survives push/pop
-            let s = TripSession(tripId: tripId)
+            guard session?.tripId != tripId else { return }  // survives push/pop
+            let s = TripSession(tripId: tripId, uid: sessionStore.uid!)
             s.start()
             session = s
 
