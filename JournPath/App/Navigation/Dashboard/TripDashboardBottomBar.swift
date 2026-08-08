@@ -20,7 +20,7 @@ struct TripDashboardBottomBar: View {
             }
 
             Button {
-                activeSheet = .notes
+                activeSheet = .checklist
             } label: {
                 Label("Notes", systemImage: "list.bullet.clipboard")
             }

@@ -8,11 +8,12 @@ struct ParticipantAvatar: View {
     @Environment(\.displayScale) private var displayScale
 
     enum Size {
-        case small, medium, large
+        case xs, small, medium, large
         case custom(CGFloat)
 
         var dimension: CGFloat {
             switch self {
+            case .xs: 12
             case .small: 24
             case .medium: 36
             case .large: 64
@@ -35,8 +36,9 @@ struct ParticipantAvatar: View {
                 KFImage(url)
                     .setProcessor(
                         DownsamplingImageProcessor(
-                            size: CGSize(width: size.dimension * displayScale,
-                                         height: size.dimension * displayScale)
+                            size: CGSize(
+                                width: size.dimension * displayScale,
+                                height: size.dimension * displayScale)
                         )
                     )
                     .cacheOriginalImage()

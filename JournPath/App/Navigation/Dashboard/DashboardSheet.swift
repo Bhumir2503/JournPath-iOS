@@ -1,13 +1,13 @@
 import SwiftUI
 
 enum DashboardSheet: String, Identifiable {
-    case participant, storage, expenses, itineraryBuilder, notes, datePicker, imagePicker
+    case participant, storage, expenses, itineraryBuilder, checklist, datePicker, imagePicker
     var id: String { rawValue }  // stable, no hashValue collisions
 }
 
 struct DashboardSheetView: View {
     let sheet: DashboardSheet
-    
+
     @Environment(SessionStore.self) private var sessionStore
     @Environment(TripStore.self) private var tripStore
     @Environment(\.dismiss) private var dismiss
@@ -17,8 +17,8 @@ struct DashboardSheetView: View {
         switch sheet {
         case .participant: ParticipantsView()
         case .storage: StorageView(uid: sessionStore.uid)
-        case .expenses: EmptyView()
-        case .notes: EmptyView()
+        case .expenses: ExpenseDummyView()
+        case .checklist: ChecklistSheet()
         case .itineraryBuilder: EmptyView()
         case .datePicker:
             DatePickerView(

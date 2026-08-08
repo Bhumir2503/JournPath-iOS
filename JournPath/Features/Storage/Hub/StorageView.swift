@@ -62,7 +62,7 @@ struct StorageView: View {
             // .sheet(item: $selected) { file in
             //     FileDetailView(file: file)
             // }
-        }
+        }.presentationDragIndicator(.visible)
     }
 
     // MARK: - Content

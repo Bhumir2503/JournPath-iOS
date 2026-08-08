@@ -71,6 +71,10 @@ final class ParticipantStore {
         participant(id: id)?.displayName ?? "Unknown"
     }
 
+    func displayPhoto(for id: String?) -> String {
+        participant(id: id)?.photoURL ?? ""
+    }
+
     // MARK: - Firestore
 
     private var rosterListener: ListenerRegistration?
