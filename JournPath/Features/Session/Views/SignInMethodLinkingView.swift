@@ -1,5 +1,5 @@
-import SwiftUI
 import FirebaseAuth
+import SwiftUI
 
 struct SignInMethodLinkingView: View {
     @Environment(SessionStore.self) private var sessionStore
@@ -8,7 +8,7 @@ struct SignInMethodLinkingView: View {
     @State private var errorMessage: String? = nil
     @State private var loadingProviderID: String? = nil
     @State private var showingEmailLinkSheet = false
-    
+
     // Provider IDs from Firebase
     private let appleProviderID = "apple.com"
     private let googleProviderID = "google.com"
@@ -39,7 +39,7 @@ struct SignInMethodLinkingView: View {
                 ) {
                     handleAction(providerId: appleProviderID, isLinked: sessionStore.isAppleLinked)
                 }
-                
+
                 ProviderRow(
                     providerName: "Google",
                     iconName: "google",
@@ -51,7 +51,7 @@ struct SignInMethodLinkingView: View {
                 ) {
                     handleAction(providerId: googleProviderID, isLinked: sessionStore.isGoogleLinked)
                 }
-                
+
                 ProviderRow(
                     providerName: "Email & Password",
                     iconName: "envelope.fill",
@@ -75,11 +75,14 @@ struct SignInMethodLinkingView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Linked Accounts")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Error", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
+        .alert(
+            "Error",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )
+        ) {
+            Button("OK") { errorMessage = nil }.keyboardShortcut(.defaultAction)
         } message: {
             if let errorMessage {
                 Text(errorMessage)
@@ -112,7 +115,7 @@ struct SignInMethodLinkingView: View {
                         _ = try await authService.linkGoogle()
                     }
                 }
-                
+
                 // Force token refresh so SessionStore updates its state
                 if let user = Auth.auth().currentUser {
                     try await user.reload()
@@ -130,18 +133,18 @@ struct SignInMethodLinkingView: View {
 struct LinkEmailView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(SessionStore.self) private var sessionStore
-    
+
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var errorMessage: String? = nil
     @State private var showPasswordRequirements = false
-    
+
     private enum Field: Hashable {
         case email, password, confirmPassword
     }
     @FocusState private var focusedField: Field?
-    
+
     var body: some View {
         Form {
             Section {
@@ -153,7 +156,7 @@ struct LinkEmailView: View {
             } footer: {
                 Text("Enter the email you want to use for this account.")
             }
-            
+
             Section {
                 HStack {
                     SecureField("Password", text: $password)
@@ -180,7 +183,7 @@ struct LinkEmailView: View {
                         .presentationCompactAdaptation(.popover)
                     }
                 }
-                
+
                 SecureField("Confirm Password", text: $confirmPassword)
                     .focused($focusedField, equals: .confirmPassword)
             } header: {
@@ -188,29 +191,29 @@ struct LinkEmailView: View {
             } footer: {
                 Text("Enter a strong password to protect your account.")
             }
-            
+
             // Submit Section
             VStack(spacing: 16) {
                 AsyncIconTextButton(
                     title: "Link Email",
                     iconName: "link",
                     isDisabled: !email.isValidEmail || !password.isValidPassword || password != confirmPassword,
-                    buttonColor: .blue,
-                    successColor: .green
+                    buttonColor: .brand,
+                    successColor: .brand
                 ) {
                     focusedField = nil
                     errorMessage = nil
-                    
+
                     guard password == confirmPassword else {
                         errorMessage = "Passwords do not match"
                         return
                     }
-                    
+
                     do {
                         guard let user = Auth.auth().currentUser else { return }
                         let credential = EmailAuthProvider.credential(withEmail: email, password: password)
                         _ = try await user.link(with: credential)
-                        
+
                         try await user.reload()
                         _ = try await user.getIDTokenResult(forcingRefresh: true)
                     } catch {
@@ -224,7 +227,7 @@ struct LinkEmailView: View {
                 } closingAction: {
                     dismiss()
                 }
-                
+
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)

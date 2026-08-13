@@ -70,11 +70,7 @@ extension SettingsView {
             NavigationLink {
                 EditProfileView()
             } label: {
-                Label {
-                    Text("Edit Profile").foregroundStyle(.primary)
-                } icon: {
-                    Image(systemName: "pencil").foregroundStyle(Color.brand)
-                }
+                Label("Edit Profile", systemImage: "pencil")
             }
         }
     }
@@ -88,21 +84,13 @@ extension SettingsView {
             NavigationLink {
                 PrivacyPolicy()
             } label: {
-                Label {
-                    Text("Privacy Policy").foregroundStyle(.primary)
-                } icon: {
-                    Image(systemName: "hand.raised").foregroundStyle(Color.brand)
-                }
+                Label("Privacy Policy", systemImage: "hand.raised")
             }
 
             NavigationLink {
                 TermsOfService()
             } label: {
-                Label {
-                    Text("Terms of Service").foregroundStyle(.primary)
-                } icon: {
-                    Image(systemName: "text.page").foregroundStyle(Color.brand)
-                }
+                Label("Terms of Service", systemImage: "text.page")
             }
 
             Button {
@@ -124,11 +112,7 @@ extension SettingsView {
                 ChangeEmailView()
             } label: {
                 HStack {
-                    Label {
-                        Text("Change Email").foregroundStyle(.primary)
-                    } icon: {
-                        Image(systemName: "envelope").foregroundStyle(Color.brand)
-                    }
+                    Label("Change Email", systemImage: "envelope")
                     if !session.isEmailPasswordLinked {
                         Spacer()
                         thirdPartyBadges
@@ -141,11 +125,7 @@ extension SettingsView {
                 ChangePasswordView()
             } label: {
                 HStack {
-                    Label {
-                        Text("Change Password").foregroundStyle(.primary)
-                    } icon: {
-                        Image(systemName: "lock.rotation").foregroundStyle(Color.brand)
-                    }
+                    Label("Change Password", systemImage: "lock.rotation")
                     if !session.isEmailPasswordLinked {
                         Spacer()
                         thirdPartyBadges
@@ -157,11 +137,7 @@ extension SettingsView {
             NavigationLink {
                 SignInMethodLinkingView()
             } label: {
-                Label {
-                    Text("Linked Sign-In Methods").foregroundStyle(.primary)
-                } icon: {
-                    Image(systemName: "person.badge.key").foregroundStyle(Color.brand)
-                }
+                Label("Linked Sign-In Methods ", systemImage: "person.badge.key")
             }
         }
     }
