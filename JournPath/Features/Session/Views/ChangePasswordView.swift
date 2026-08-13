@@ -115,8 +115,8 @@ struct ChangePasswordView: View {
                     title: "Update Password",
                     iconName: "lock.fill",
                     isDisabled: !isValid,
-                    buttonColor: .blue,
-                    successColor: .blue,
+                    buttonColor: .brand,
+                    successColor: .brand
                 ) {
                     focusedField = nil
                     errorMessage = nil

@@ -237,8 +237,8 @@ extension EmailAuthView {
             if canSubmit {
                 AsyncIconTextButton(
                     title: isSignUpMode ? "Create Account" : "Sign In",
-                    buttonColor: .blue,
-                    successColor: .blue,
+                    buttonColor: .brand,
+                    successColor: .brand,
                     isFormStyle: false
                 ) {
                     session.isHandlingManualAuth = true

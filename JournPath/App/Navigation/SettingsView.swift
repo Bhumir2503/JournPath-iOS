@@ -25,7 +25,6 @@ struct SettingsView: View {
             #endif
             logoutButton
         }
-        .tint(.brand)
         .scrollIndicators(.hidden)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -71,7 +70,11 @@ extension SettingsView {
             NavigationLink {
                 EditProfileView()
             } label: {
-                Label("Edit Profile", systemImage: "pencil")
+                Label {
+                    Text("Edit Profile").foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "pencil").foregroundStyle(Color.brand)
+                }
             }
         }
     }
@@ -85,13 +88,21 @@ extension SettingsView {
             NavigationLink {
                 PrivacyPolicy()
             } label: {
-                Label("Privacy Policy", systemImage: "hand.raised")
+                Label {
+                    Text("Privacy Policy").foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "hand.raised").foregroundStyle(Color.brand)
+                }
             }
 
             NavigationLink {
                 TermsOfService()
             } label: {
-                Label("Terms of Service", systemImage: "text.page")
+                Label {
+                    Text("Terms of Service").foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "text.page").foregroundStyle(Color.brand)
+                }
             }
 
             Button {
@@ -113,7 +124,11 @@ extension SettingsView {
                 ChangeEmailView()
             } label: {
                 HStack {
-                    Label("Change Email", systemImage: "envelope")
+                    Label {
+                        Text("Change Email").foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "envelope").foregroundStyle(Color.brand)
+                    }
                     if !session.isEmailPasswordLinked {
                         Spacer()
                         thirdPartyBadges
@@ -126,7 +141,11 @@ extension SettingsView {
                 ChangePasswordView()
             } label: {
                 HStack {
-                    Label("Change Password", systemImage: "lock.rotation")
+                    Label {
+                        Text("Change Password").foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "lock.rotation").foregroundStyle(Color.brand)
+                    }
                     if !session.isEmailPasswordLinked {
                         Spacer()
                         thirdPartyBadges
@@ -138,7 +157,11 @@ extension SettingsView {
             NavigationLink {
                 SignInMethodLinkingView()
             } label: {
-                Label("Linked Sign-In Methods ", systemImage: "person.badge.key")
+                Label {
+                    Text("Linked Sign-In Methods").foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "person.badge.key").foregroundStyle(Color.brand)
+                }
             }
         }
     }

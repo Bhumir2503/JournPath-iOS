@@ -58,8 +58,8 @@ struct ChangeEmailView: View {
                     title: "Update Email",
                     iconName: "envelope.fill",
                     isDisabled: !isValid,
-                    buttonColor: .blue,
-                    successColor: .blue
+                    buttonColor: .brand,
+                    successColor: .brand
                 ) {
                     focusedField = nil
                     errorMessage = nil

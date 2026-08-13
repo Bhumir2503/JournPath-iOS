@@ -204,8 +204,8 @@ struct EditProfileView: View {
                     title: "Save Changes",
                     iconName: "",
                     isDisabled: !isValid,
-                    buttonColor: .blue,
-                    successColor: .blue
+                    buttonColor: .brand,
+                    successColor: .brand
                 ) {
                     isNameFocused = false
                     errorMessage = nil

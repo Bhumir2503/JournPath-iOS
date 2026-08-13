@@ -134,8 +134,8 @@ extension ForgotPasswordView {
             if email.isValidEmail {
                 AsyncIconTextButton(
                     title: "Send Reset Link",
-                    buttonColor: .blue,
-                    successColor: .blue,
+                    buttonColor: .brand,
+                    successColor: .brand,
                     successIconName: "paperplane.fill",
                     isFormStyle: false,
                 ) {
