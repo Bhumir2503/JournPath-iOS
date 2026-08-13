@@ -6,8 +6,6 @@ struct TripDashboardMenu: View {
 
     @Binding var activeSheet: DashboardSheet?
     @Binding var activeAlert: DashboardAlert?
-    
-    
 
     var body: some View {
         Menu {
@@ -47,7 +45,7 @@ struct TripDashboardMenu: View {
 
             if trip.tier == .free {
                 Button {
-                    // Upgrade action
+                    activeSheet = .paywall
                 } label: {
                     Label("Upgrade to Pro", systemImage: "sparkles")
                         .foregroundStyle(.blue)

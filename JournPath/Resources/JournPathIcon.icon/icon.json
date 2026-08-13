@@ -1,8 +1,8 @@
 {
   "fill" : {
     "linear-gradient" : [
-      "extended-gray:1.00000,1.00000",
-      "extended-gray:1.00000,1.00000"
+      "srgb:0.38039,0.72941,0.49804,1.00000",
+      "srgb:0.38039,0.72941,0.49804,1.00000"
     ],
     "orientation" : {
       "start" : {
@@ -19,103 +19,35 @@
     {
       "layers" : [
         {
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "extended-gray:0.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:0.38039,0.72941,0.49804,1.00000"
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "srgb:0.38039,0.72941,0.49804,1.00000"
+              }
+            }
+          ],
           "glass" : false,
           "hidden" : false,
-          "image-name" : "Rectangle 1 2.png",
-          "name" : "Rectangle 1 2",
+          "image-name" : "backpack.svg",
+          "name" : "backpack",
           "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              183.234375,
-              206.578125
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Rectangle 2.png",
-          "name" : "Rectangle 2",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              355.0390625,
-              304.5703125
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Rectangle 1.png",
-          "name" : "Rectangle 1",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -359.5546875,
-              85.4140625
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Rectangle 3.png",
-          "name" : "Rectangle 3",
-          "position" : {
-            "scale" : 1,
+            "scale" : 10.8,
             "translation-in-points" : [
               0,
-              -369.890625
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Rectangle 4.png",
-          "name" : "Rectangle 4",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -15.5,
-              -180.40625
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "image-name" : "Vector-1.png",
-          "name" : "Vector-1",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -78.4609375,
-              372.6953125
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "image-name" : "Vector-2.png",
-          "name" : "Vector-2",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              299.5625,
-              -154.5390625
-            ]
-          }
-        },
-        {
-          "glass" : false,
-          "image-name" : "Vector.png",
-          "name" : "Vector",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -309.4609375,
-              -260.5390625
+              0
             ]
           }
         }

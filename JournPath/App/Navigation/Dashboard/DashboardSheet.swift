@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DashboardSheet: String, Identifiable {
-    case participant, storage, expenses, itineraryBuilder, checklist, datePicker, imagePicker
+    case participant, storage, expenses, itineraryBuilder, checklist, datePicker, imagePicker, paywall
     var id: String { rawValue }  // stable, no hashValue collisions
 }
 
@@ -44,6 +44,8 @@ struct DashboardSheetView: View {
                     dismiss()
                 }
             )
+        case .paywall:
+            PaywallView()
         }
     }
 }

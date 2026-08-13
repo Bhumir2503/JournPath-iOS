@@ -162,25 +162,24 @@ struct ChecklistSheet: View {
                                     }
                                 }
                             }
-
-                            Button {
-                                editingList = nil
-                                isPresentingNewList = true
-                            } label: {
-                                Image(systemName: "plus")
-                                    .padding(8)
-                                    .background(Color(.systemGray5))
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
                         }
                         .padding(.horizontal)
                         .padding(.bottom, 8)
-                        .padding(.top, )
-                    }.padding(.top)
+                    }
                 }
             }
+            .navigationTitle("Checklists")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        editingList = nil
+                        isPresentingNewList = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+
                 if let store = store, !store.lists.isEmpty {
                     ToolbarItemGroup(placement: .bottomBar) {
                         HStack(spacing: 12) {

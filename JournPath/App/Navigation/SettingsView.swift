@@ -25,6 +25,7 @@ struct SettingsView: View {
             #endif
             logoutButton
         }
+        .tint(.brand)
         .scrollIndicators(.hidden)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)

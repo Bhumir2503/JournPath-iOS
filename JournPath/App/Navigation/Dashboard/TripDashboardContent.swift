@@ -54,11 +54,13 @@ struct TripDashboardContent: View {
                         ? "You've been removed from this trip."
                         : error.localizedDescription)
             } actions: {
-                if wasKicked {
-                    Button("Back to trips") { router.popToRoot() }
-                } else {
-                    Button("Retry") { tripStore.retry() }
-                }
+                Group {
+                    if wasKicked {
+                        Button("Back to trips") { router.popToRoot() }
+                    } else {
+                        Button("Retry") { tripStore.retry() }
+                    }
+                }.tint(.brand)
             }
 
         case .idle, .loading:
