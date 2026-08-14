@@ -202,7 +202,7 @@ struct ParticipantsView: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.blue)
+                .background(Color.brand)
                 .clipShape(.capsule)
                 .padding(.horizontal)
             }

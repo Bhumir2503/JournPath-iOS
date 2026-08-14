@@ -24,7 +24,7 @@ struct ChecklistItemRow: View {
             } label: {
                 Image(systemName: item.isDone(for: uid) ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
-                    .foregroundColor(item.isDone(for: uid) ? .blue : .gray)
+                    .foregroundColor(item.isDone(for: uid) ? .brand : .gray)
             }
             .buttonStyle(.plain)
 
@@ -73,7 +73,7 @@ struct ChecklistItemRow: View {
             } label: {
                 Label("", systemImage: item.isDone(for: uid) ? "circle" : "checkmark")
             }
-            .tint(item.isDone(for: uid) ? .gray : .blue)
+            .tint(item.isDone(for: uid) ? .gray : .brand)
         }
         .onAppear {
             editTitle = item.title

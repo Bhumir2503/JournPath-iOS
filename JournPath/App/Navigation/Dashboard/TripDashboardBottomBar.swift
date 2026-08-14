@@ -34,7 +34,6 @@ struct TripDashboardBottomBar: View {
                     Label("Add Activity", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.brand)
             }
         }
     }

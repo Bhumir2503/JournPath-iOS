@@ -1,235 +1,195 @@
-import HorizonCalendar
-import SwiftUI
+import Combine
+import Foundation
+import UIKit
 
-struct DatePickerView: View {
-    @StateObject private var vm: DatePickerVM
-    var onCancel: () -> Void
-    var onSubmit: (Date, Date) -> Void
-
-    init(
-        initialStartDate: Date? = nil,
-        initialEndDate: Date? = nil,
-        dateRange: ClosedRange<Date>? = nil,
-        onCancel: @escaping () -> Void,
-        onSubmit: @escaping (Date, Date) -> Void
-    ) {
-        self._vm = StateObject(wrappedValue: DatePickerVM(
-            initialStartDate: initialStartDate,
-            initialEndDate: initialEndDate,
-            dateRange: dateRange
-        ))
-        self.onCancel = onCancel
-        self.onSubmit = onSubmit
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack {
-                CalendarViewRepresentable(vm: vm)
-            }
-            .ignoresSafeArea(edges: .bottom)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if let start = vm.selectedStartDate, let end = vm.selectedEndDate {
-                        if Calendar.current.isDate(start, inSameDayAs: end) {
-                            Text(start.displayString())
-                                .fontWeight(.bold)
-                        } else {
-                            HStack(spacing: 8) {
-                                Text(start.displayString())
-                                Image(systemName: "arrow.right")
-                                Text(end.displayString())
-                            }
-                            .fontWeight(.bold)
-                        }
-                    } else if let start = vm.selectedStartDate {
-                        Text(start.displayString())
-                            .fontWeight(.bold)
-                    } else {
-                        Text("Select Dates")
-                            .fontWeight(.bold)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        onCancel()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(role: .confirm) {
-                        if let start = vm.selectedStartDate, let end = vm.selectedEndDate {
-                            onSubmit(start, end)
-                        } else if let start = vm.selectedStartDate {
-                            onSubmit(start, start)
-                        }
-                    } label: {
-                        Image(systemName: "checkmark")
-                    }
-                    .disabled(!vm.canSubmit)
-                }
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Spacer()
-                    Button {
-                        vm.resetSelection()
-                    } label: {
-                        Text("Clear")
-                    }
-                    .disabled(vm.selectedStartDate == nil)
-                }
-            }
-        }
-    }
+enum DaySelectionState {
+    case unselected
+    case start(isSameDay: Bool)
+    case end
+    case between
+    case outOfRange
 }
 
-struct CalendarViewRepresentable: UIViewRepresentable {
-    @ObservedObject var vm: DatePickerVM
+class DatePickerVM: ObservableObject {
+    @Published var selectedStartDate: Date?
+    @Published var selectedEndDate: Date?
 
-    func makeUIView(context: Context) -> CalendarView {
-        let calendarView = CalendarView(initialContent: makeContent())
-        calendarView.backgroundColor = .clear
+    let calendar: Calendar
 
-        calendarView.daySelectionHandler = { [calendar = vm.calendar] day in
-            if let date = calendar.date(from: day.components) {
-                vm.handleDaySelection(date)
-            }
-        }
+    /// Visible range — full months, so the month containing the earliest
+    /// selectable day is shown in its entirety.
+    let minDate: Date
+    let maxDate: Date
 
-        // Land on the month containing the current selection, or today's date if
-        // no date is selected and there's no strict date range (unconstrained case).
-        // If there is a strict range, land on its start date.
-        DispatchQueue.main.async {
-            let defaultDate = vm.selectedStartDate ?? (vm.requiresEndOnOrAfterToday ? vm.today : vm.selectableRange.lowerBound)
+    /// Selectable range — start-of-day normalized bounds.
+    let selectableRange: ClosedRange<Date>
+
+    /// Start of today, used to enforce the end-date rule.
+    let today: Date
+
+    /// When true (no explicit dateRange), the end date must be today or later.
+    let requiresEndOnOrAfterToday: Bool
+
+    /// Trips are capped at 120 days.
+    let maxRangeInDays = 120
+
+    private let haptic = UIImpactFeedbackGenerator(style: .light)
+
+    init(initialStartDate: Date? = nil, initialEndDate: Date? = nil, dateRange: ClosedRange<Date>? = nil) {
+        var cal = Calendar.current
+        cal.locale = Locale.current
+        self.calendar = cal
+
+        let today = cal.startOfDay(for: Date())
+        self.today = today
+
+        let lowerBound: Date
+        let upperBound: Date
+
+        if let range = dateRange {
+            // An explicit range (e.g. the parent trip's dates) is the hard
+            // boundary — only days inside it are selectable, nothing else.
+            lowerBound = cal.startOfDay(for: range.lowerBound)
+            upperBound = cal.startOfDay(for: range.upperBound)
+            self.requiresEndOnOrAfterToday = false
+        } else {
+            // Start dates can go up to 120 days or the start of the month 3 months ago, whichever is smaller.
+            // back if an existing selection starts earlier than that.
+            let maxPast120 = cal.date(byAdding: .day, value: -120, to: today) ?? today
+            let threeMonthsAgo = cal.date(byAdding: .month, value: -3, to: today) ?? today
+            let firstOfThreeMonthsAgo = cal.date(from: cal.dateComponents([.year, .month], from: threeMonthsAgo)) ?? threeMonthsAgo
+            let maxPast = max(maxPast120, firstOfThreeMonthsAgo)
             
-            calendarView.scroll(
-                toMonthContaining: defaultDate,
-                scrollPosition: .firstFullyVisiblePosition(padding: 0),
-                animated: false
-            )
+            lowerBound = initialStartDate != nil ? min(cal.startOfDay(for: initialStartDate!), maxPast) : maxPast
+
+            // Max selectable date is 18 months from today.
+            let eighteenMonths = cal.date(byAdding: .month, value: 18, to: today) ?? today
+            let firstOfUpperMonth = cal.date(from: cal.dateComponents([.year, .month], from: eighteenMonths)) ?? eighteenMonths
+            
+            // Snap to the last day of that month so the whole month is pickable
+            upperBound = cal.date(byAdding: DateComponents(month: 1, day: -1), to: firstOfUpperMonth) ?? eighteenMonths
+            self.requiresEndOnOrAfterToday = true
         }
 
-        return calendarView
-    }
+        self.selectableRange = lowerBound...max(lowerBound, upperBound)
 
-    func updateUIView(_ uiView: CalendarView, context: Context) {
-        uiView.setContent(makeContent())
-    }
+        // Show the full month at both ends, but days before lowerBound
+        // (or after upperBound) render as out-of-range and can't be tapped.
+        let firstOfLowerMonth =
+            cal.date(
+                from: cal.dateComponents([.year, .month], from: lowerBound)
+            ) ?? lowerBound
 
-    private func makeContent() -> CalendarViewContent {
-        CalendarViewContent(
-            calendar: vm.calendar,
-            visibleDateRange: vm.minDate...vm.maxDate,
-            monthsLayout: .vertical(options: VerticalMonthsLayoutOptions())
-        )
-        .interMonthSpacing(24)
-        .verticalDayMargin(8)
-        .horizontalDayMargin(0)
-        .dayItemProvider { day in
-            let date = vm.calendar.date(from: day.components) ?? Date()
-            let isToday = vm.calendar.isDateInToday(date)
-            let state = vm.state(for: date)
-            let weekday = vm.calendar.component(.weekday, from: date)
-            let isFirstDayOfWeek = weekday == vm.calendar.firstWeekday
-            let isLastDayOfWeek = weekday == ((vm.calendar.firstWeekday + 5) % 7 + 1)
+        let firstOfUpperMonth =
+            cal.date(
+                from: cal.dateComponents([.year, .month], from: upperBound)
+            ) ?? upperBound
+        let endOfUpperMonth = cal.date(byAdding: DateComponents(month: 1, day: -1), to: firstOfUpperMonth) ?? upperBound
 
-            return CalendarDayCell(
-                dayNumber: day.day,
-                state: state,
-                isToday: isToday,
-                isFirstDayOfWeek: isFirstDayOfWeek,
-                isLastDayOfWeek: isLastDayOfWeek
-            )
-            .calendarItemModel
+        self.minDate = firstOfLowerMonth
+        self.maxDate = endOfUpperMonth
+
+        self.selectedStartDate = initialStartDate
+        if let start = initialStartDate, let end = initialEndDate, cal.isDate(start, inSameDayAs: end) {
+            self.selectedEndDate = nil
+        } else {
+            self.selectedEndDate = initialEndDate
         }
-        .monthHeaderItemProvider { month in
-            var text = ""
-            if let date = vm.calendar.date(from: month.components) {
-                text = DateFormatter.monthYear.string(from: date)
+    }
+
+    func handleDaySelection(_ date: Date) {
+        let day = calendar.startOfDay(for: date)
+
+        // Ignore taps outside the selectable range entirely.
+        guard selectableRange.contains(day) else { return }
+
+        if let start = selectedStartDate, selectedEndDate == nil {
+            let startDay = calendar.startOfDay(for: start)
+
+            // Ignore taps beyond the 120-day cap — those days are shown
+            // as out-of-range, so tapping them does nothing.
+            if let diff = calendar.dateComponents([.day], from: startDay, to: day).day,
+                abs(diff) > maxRangeInDays
+            {
+                return
             }
-            return HStack {
-                Text(text)
-                    .font(.title2.bold())
-                Spacer()
+
+            // The end of the range must be today or later. This covers both
+            // directions: a tap before the start makes the old start the end,
+            // and since day >= today implies old start > today, that's valid.
+            if requiresEndOnOrAfterToday && day < today {
+                return
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
-            .calendarItemModel
+
+            if day < startDay {
+                selectedEndDate = start
+                selectedStartDate = date
+            } else {
+                selectedEndDate = date
+            }
+        } else {
+            selectedStartDate = date
+            selectedEndDate = nil
         }
-        .dayOfWeekItemProvider { month, weekdayIndex in
-            let weekdayStrings = vm.calendar.veryShortWeekdaySymbols
-            let text = weekdayStrings[weekdayIndex]
-
-            return Text(text)
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity)
-                .calendarItemModel
-        }
-    }
-}
-
-struct CalendarDayCell: View {
-    let dayNumber: Int
-    let state: DaySelectionState
-    let isToday: Bool
-    let isFirstDayOfWeek: Bool
-    let isLastDayOfWeek: Bool
-
-    var themeColor: Color = .blue
-
-    var body: some View {
-        Text("\(dayNumber)")
-            .font(.system(size: 18, weight: isToday ? .bold : .regular))
-            .foregroundColor(textColor)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(backgroundView)
+        triggerHaptic()
     }
 
-    private var textColor: Color {
-        switch state {
-        case .start, .end: return .white
-        case .outOfRange: return Color(UIColor.tertiaryLabel)
-        default: return isToday ? themeColor : .primary
+    /// The selection is submittable when a valid range exists. A lone start
+    /// date counts as a single-day trip, which must not be in the past.
+    var canSubmit: Bool {
+        guard let start = selectedStartDate else { return false }
+        if selectedEndDate != nil { return true }
+        if requiresEndOnOrAfterToday {
+            return calendar.startOfDay(for: start) >= today
         }
+        return true
     }
 
-    @ViewBuilder
-    private var backgroundView: some View {
-        ZStack {
-            switch state {
-            case .between:
-                Rectangle()
-                    .fill(themeColor.opacity(0.3))
-                    .frame(height: 40)
-                    .clipShape(
-                        .rect(
-                            topLeadingRadius: isFirstDayOfWeek ? 20 : 0,
-                            bottomLeadingRadius: isFirstDayOfWeek ? 20 : 0,
-                            bottomTrailingRadius: isLastDayOfWeek ? 20 : 0,
-                            topTrailingRadius: isLastDayOfWeek ? 20 : 0
-                        )
-                    )
-            case .start(let isSameDay):
-                if !isSameDay && !isLastDayOfWeek {
-                    HStack(spacing: 0) {
-                        Color.clear
-                        themeColor.opacity(0.3)
-                    }.frame(height: 40)
+    private func triggerHaptic() {
+        haptic.prepare()
+        haptic.impactOccurred()
+    }
+
+    func resetSelection() {
+        selectedStartDate = nil
+        selectedEndDate = nil
+    }
+
+    func state(for dayDate: Date) -> DaySelectionState {
+        let day = calendar.startOfDay(for: dayDate)
+
+        guard selectableRange.contains(day) else { return .outOfRange }
+
+        // While picking an end date, gray out days that can't be a valid end:
+        // days beyond the 120-day cap, and — when the rule applies — days
+        // before today (the end date must be today or later).
+        if let start = selectedStartDate, selectedEndDate == nil {
+            let startDay = calendar.startOfDay(for: start)
+            if day != startDay {
+                if let diff = calendar.dateComponents([.day], from: startDay, to: day).day,
+                    abs(diff) > maxRangeInDays
+                {
+                    return .outOfRange
                 }
-                Circle().fill(themeColor).frame(width: 40, height: 40)
-            case .end:
-                if !isFirstDayOfWeek {
-                    HStack(spacing: 0) {
-                        themeColor.opacity(0.3)
-                        Color.clear
-                    }.frame(height: 40)
+                if requiresEndOnOrAfterToday && day < today {
+                    return .outOfRange
                 }
-                Circle().fill(themeColor).frame(width: 40, height: 40)
-            case .unselected, .outOfRange:
-                EmptyView()
             }
         }
+
+        guard let start = selectedStartDate else { return .unselected }
+        let normStart = calendar.startOfDay(for: start)
+
+        if let end = selectedEndDate {
+            let normEnd = calendar.startOfDay(for: end)
+            if day == normStart && day == normEnd { return .start(isSameDay: true) }
+            if day == normStart { return .start(isSameDay: false) }
+            if day == normEnd { return .end }
+            if day > normStart && day < normEnd { return .between }
+        } else {
+            if day == normStart { return .start(isSameDay: true) }
+        }
+
+        return .unselected
     }
 }

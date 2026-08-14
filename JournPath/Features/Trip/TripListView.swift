@@ -78,7 +78,6 @@ struct TripListView: View {
                 Label("New Trip", systemImage: "square.and.pencil")
             }
             .buttonStyle(.borderedProminent)
-            .tint(.brand)
         }
     }
 }

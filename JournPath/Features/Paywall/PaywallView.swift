@@ -49,7 +49,7 @@ struct PaywallView: View {
 
     /// Single source of truth. Deliberately computed — a `@State` copy
     /// would freeze at its initial value and never track the service.
-    private var state: PaywallState { purchases.paywallState }
+    private var state: PaywallState { purchases.paywallState(for: trip.tripId) }
 
     /// Only a total failure to load products gets the full-screen
     /// treatment. Every other failure is recoverable inline, and replacing

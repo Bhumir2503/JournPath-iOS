@@ -135,7 +135,7 @@ struct ChecklistSheet: View {
                                     Label(list.title, systemImage: list.icon ?? "star.fill")
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(isSelected ? .blue : Color(.systemGray5))
+                                        .background(isSelected ? .brand : Color(.systemGray5))
                                         .foregroundColor(isSelected ? .white : .primary)
                                         .clipShape(Capsule())
                                 }

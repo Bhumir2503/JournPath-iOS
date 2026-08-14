@@ -12,12 +12,18 @@ final class PurchaseService {
     private(set) var products: [Product] = []
     private(set) var phase: Phase = .idle
 
-    /// Swap the stub for your API implementation when the endpoint lands.
-    var redeemer = APIRedeemer()
+    /// Which trip `phase` refers to. Without this, a failure on trip A is
+    /// still on screen when the user opens trip B's paywall.
+    private(set) var phaseTripID: String?
+
+    /// Protocol-typed so `StubRedeemer` can be dropped in for testing.
+    var redeemer: PurchaseRedeeming = APIRedeemer()
 
     @ObservationIgnored private var listener: Task<Void, Never>?
 
     private init() {}
+
+    // MARK: Types
 
     enum Phase: Equatable {
         case idle
@@ -43,9 +49,9 @@ final class PurchaseService {
         /// Whether the customer's card was charged. Drives both the wording
         /// and the styling — a charged-but-unfinished purchase must not look
         /// like a failure, or people buy a second time.
-        var paymentTaken: Bool { self == .recordingFailed }
+        nonisolated var paymentTaken: Bool { self == .recordingFailed }
 
-        var message: String {
+        nonisolated var message: String {
             switch self {
             case .productsUnavailable:
                 "This upgrade isn't available right now. Try again in a few minutes."
@@ -61,19 +67,33 @@ final class PurchaseService {
         }
     }
 
+    /// Thrown for genuine failures only. Cancelling and Ask to Buy are
+    /// normal outcomes and never throw.
+    struct PurchaseFailed: LocalizedError {
+        let failure: Failure
+        nonisolated var errorDescription: String? { failure.message }
+        nonisolated var paymentTaken: Bool { failure.paymentTaken }
+    }
+
+    enum Outcome {
+        case unlocked
+        /// Backed out of Apple's sheet. Show nothing.
+        case cancelled
+        /// Ask to Buy. No money moved; approval may arrive days later.
+        case pending
+    }
+
     private enum RedeemError: Error {
         /// StoreKit couldn't verify Apple's signature. Don't grant, don't finish.
         case unverified
+        /// Recovered a transaction with no record of which trip it was for.
+        case unknownTrip
         case serverRejected
     }
 
     // MARK: Lifecycle
 
     /// Call once at app launch, before any purchase UI exists.
-    ///
-    /// The listener has to run for the whole session. It's how Ask to Buy
-    /// approvals, purchases made on another device, and transactions that
-    /// failed to redeem earlier get delivered.
     func start() {
         guard listener == nil else { return }
 
@@ -88,8 +108,6 @@ final class PurchaseService {
             await sweepUnfinished()
         }
     }
-
-    deinit { listener?.cancel() }
 
     // MARK: Products
 
@@ -113,94 +131,93 @@ final class PurchaseService {
 
     // MARK: Purchasing
 
-    /// Buys one credit and spends it on `tripID` in a single server call.
-    ///
-    /// Returns true only once the server has confirmed. Even then, the UI
-    /// should unlock off the Firestore listener rather than this value —
-    /// a consumable leaves no trace in StoreKit, so the trip document is
-    /// the only durable record.
     @discardableResult
-    func purchaseTripUnlock(for tripID: String) async throws -> Bool {
+    func purchaseTripUnlock(for tripID: String) async throws -> Outcome {
         guard let product = tripUnlock else {
-            phase = .failed(.productsUnavailable)
-            throw RedeemError.unverified
+            throw enterFailure(.productsUnavailable, tripID: tripID)
         }
         return try await purchase(product, tripID: tripID)
     }
 
     @discardableResult
-    func purchase(_ product: Product, tripID: String) async throws -> Bool {
+    func purchase(_ product: Product, tripID: String) async throws -> Outcome {
         phase = .purchasing
+        phaseTripID = tripID
 
+        // --- Stage 1: Apple's payment sheet ---
+        let result: Product.PurchaseResult
         do {
-            switch try await product.purchase() {
-
-            case .success(let verification):
-                // Money has moved. Everything below is recovery-critical.
-                phase = .confirming
-                try await redeem(verification, tripID: tripID)
-                phase = .idle
-                return true
-
-            case .pending:
-                phase = .awaitingApproval
-                throw Product.PurchaseError.purchaseNotAllowed
-
-            case .userCancelled:
-                // Not an error. Say nothing, show nothing.
-                phase = .idle
-                throw Product.PurchaseError.purchaseNotAllowed
-
-            @unknown default:
-                phase = .idle
-                throw Product.PurchaseError.purchaseNotAllowed
-            }
-
-        } catch let error as RedeemError {
-            // Charged but not recorded. Distinct from a failed purchase.
-            print("[Purchases] Redeem failed: \(error)")
-            phase = .failed(.recordingFailed)
-            throw RedeemError.unverified
-
-        } catch let error as Product.PurchaseError {
-            switch error {
-            case .productUnavailable:
-                phase = .failed(.productsUnavailable)
-            case .purchaseNotAllowed:
-                phase = .failed(.notAllowed)
-            default:
-                phase = .failed(.unknown(error.localizedDescription))
-            }
-            throw Product.PurchaseError.purchaseNotAllowed
-
-        } catch let error as StoreKitError {
-            if case .networkError = error {
-                phase = .failed(.network)
-            } else {
-                phase = .failed(.unknown(error.localizedDescription))
-            }
-            throw Product.PurchaseError.purchaseNotAllowed
-
+            result = try await product.purchase()
         } catch {
-            phase = .failed(.unknown(error.localizedDescription))
-            throw Product.PurchaseError.purchaseNotAllowed
+            throw enterFailure(map(error), tripID: tripID)
+        }
+
+        switch result {
+
+        case .success(let verification):
+            // Money has moved. Everything below is recovery-critical.
+            phase = .confirming
+
+            do {
+                try await redeem(verification, tripID: tripID)
+            } catch {
+                print("[Purchases] Redeem failed: \(error)")
+                throw enterFailure(.recordingFailed, tripID: tripID)
+            }
+
+            reset()
+            return .unlocked
+
+        case .pending:
+            // No money moved. Not an error.
+            phase = .awaitingApproval
+            return .pending
+
+        case .userCancelled:
+            reset()
+            return .cancelled
+
+        @unknown default:
+            reset()
+            return .cancelled
         }
     }
 
-    /// Re-sends anything StoreKit still holds, then lets the caller refresh
-    /// server state.
-    ///
-    /// Consumables aren't restorable in the classic sense — they never appear
-    /// in `currentEntitlements`. This is a repair path for a transaction that
-    /// never reached the server, and the control App Review looks for.
     func restore() async {
-        phase = .confirming
         await sweepUnfinished()
-        phase = .idle
+        reset()
     }
 
     func clearFailure() {
-        if case .failed = phase { phase = .idle }
+        if case .failed = phase { reset() }
+    }
+
+    // MARK: Phase helpers
+
+    private func reset() {
+        phase = .idle
+        phaseTripID = nil
+    }
+
+    private func enterFailure(_ failure: Failure, tripID: String?) -> PurchaseFailed {
+        phase = .failed(failure)
+        phaseTripID = tripID
+        return PurchaseFailed(failure: failure)
+    }
+
+    private func map(_ error: Error) -> Failure {
+        if let error = error as? Product.PurchaseError {
+            switch error {
+            case .productUnavailable: return .productsUnavailable
+            case .purchaseNotAllowed: return .notAllowed
+            default: return .unknown(error.localizedDescription)
+            }
+        }
+        if let error = error as? StoreKitError {
+            if case .networkError = error { return .network }
+            return .unknown(error.localizedDescription)
+        }
+        return .unknown(error.localizedDescription)
     }
 
     // MARK: Redemption
@@ -215,10 +232,24 @@ final class PurchaseService {
             throw RedeemError.unverified
         }
 
+        // `/purchase/redeem` requires a tripId, so a recovered transaction
+        // needs one too. Record the pairing the instant we have a
+        // transaction ID — before the network call that might fail.
+        if let tripID {
+            PendingTrips.record(tripID: tripID, for: transaction.id)
+        }
+
+        guard let tripID = tripID ?? PendingTrips.tripID(for: transaction.id) else {
+            // Charged on a device we no longer have state for — a reinstall
+            // between purchase and redemption. Nothing to do client-side.
+            print("[Purchases] No trip recorded for transaction \(transaction.id)")
+            throw RedeemError.unknownTrip
+        }
+
         do {
             try await redeemer.redeem(
                 signedTransaction: result.jwsRepresentation,
-                tripID: tripID
+                tripId: tripID
             )
         } catch {
             throw RedeemError.serverRejected
@@ -227,6 +258,7 @@ final class PurchaseService {
         // Only now. Finishing before the server confirms discards the
         // only retry mechanism there is.
         await transaction.finish()
+        PendingTrips.clear(for: transaction.id)
     }
 
     /// Background redemption — no UI, failures left for the next attempt.
@@ -245,25 +277,57 @@ final class PurchaseService {
     }
 }
 
+// MARK: - Pending trip mapping
+
+/// Remembers which trip a transaction was bought for, so a redemption that
+/// fails and is retried on a later launch still knows where to spend.
+///
+/// Deliberately `UserDefaults` — this must survive a crash and a relaunch,
+/// and it holds no sensitive data.
+private enum PendingTrips {
+    private static let key = "purchases.pendingTripIDs"
+
+    private static var map: [String: String] {
+        get { UserDefaults.standard.dictionary(forKey: key) as? [String: String] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    static func record(tripID: String, for transactionID: UInt64) {
+        map["\(transactionID)"] = tripID
+    }
+
+    static func tripID(for transactionID: UInt64) -> String? {
+        map["\(transactionID)"]
+    }
+
+    static func clear(for transactionID: UInt64) {
+        map["\(transactionID)"] = nil
+    }
+}
+
 // MARK: - Paywall mapping
 
 extension PurchaseService {
 
-    /// Translates the service's phase into what the sheet renders.
-    var paywallState: PaywallState {
+    /// What the sheet for `tripID` should render.
+    func paywallState(for tripID: String) -> PaywallState {
+        if let phaseTripID, phaseTripID != tripID {
+            return tripUnlockPrice == nil ? .loading : .ready
+        }
+
         switch phase {
         case .idle:
-            tripUnlockPrice == nil ? .loading : .ready
+            return tripUnlockPrice == nil ? .loading : .ready
         case .loadingProducts:
-            .loading
+            return .loading
         case .purchasing:
-            .purchasing
+            return .purchasing
         case .confirming:
-            .confirming
+            return .confirming
         case .awaitingApproval:
-            .awaitingApproval
+            return .awaitingApproval
         case .failed(let failure):
-            .failed(message: failure.message, paymentTaken: failure.paymentTaken)
+            return .failed(message: failure.message, paymentTaken: failure.paymentTaken)
         }
     }
 }

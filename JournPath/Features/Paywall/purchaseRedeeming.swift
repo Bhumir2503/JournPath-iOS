@@ -1,39 +1,51 @@
 import Foundation
 
-// MARK: - Stub
-
-/// Placeholder until `/purchases/redeem` exists.
+/// The one thing `PurchaseService` needs from the backend.
 ///
-/// Set `succeeds` to exercise both branches of the UI: `true` walks the
-/// happy path, `false` produces the "you were charged, we're still
-/// unlocking" state without needing a network at all.
-struct StubRedeemer {
+/// Implementations must be **idempotent**: the same signed transaction may
+/// arrive more than once — on retry after a dropped response, on the next
+/// launch, from a second device. The server keys on the Apple transaction
+/// ID and grants at most once.
+protocol PurchaseRedeeming {
 
-    var succeeds = true
-    var delay: Duration = .milliseconds(600)
-
-    func redeem(signedTransaction: String, tripID: String?) async throws {
-        try? await Task.sleep(for: delay)
-
-        print("[Redeem] trip=\(tripID ?? "none") jws=\(signedTransaction.prefix(24))…")
-
-        if !succeeds {
-            throw URLError(.timedOut)
-        }
-    }
+    /// - Parameters:
+    ///   - signedTransaction: The JWS representation, sent raw. The server
+    ///     verifies Apple's signature itself; a client-decoded transaction
+    ///     is trivially forgeable.
+    ///   - tripId: The trip to unlock. Required by `/purchase/redeem`.
+    func redeem(signedTransaction: String, tripId: String) async throws
 }
 
 // MARK: - Real implementation
 
-/// Swap this in once the endpoint is live.
-///
-struct APIRedeemer {
-    func redeem(signedTransaction: String, tripID: String?) async throws {
-        var body: [String: Any] = ["signedTransaction": signedTransaction]
-        if let tripID { body["tripId"] = tripID }
-        _ = try await APIClient.shared.post("/purchases/redeem", body: body)
+struct APIRedeemer: PurchaseRedeeming {
+    /// The request carries the Firebase ID token via `APIClient` — the
+    /// server grants to the authenticated uid, never to one in the body.
+    func redeem(signedTransaction: String, tripId: String) async throws {
+        _ = try await APIClient.shared.post(
+            "/purchase/redeem",
+            body: [
+                "signedTransaction": signedTransaction,
+                "tripId": tripId,
+            ]
+        )
     }
 }
+
+// MARK: - Stub
+
+/// For exercising the UI without a backend.
 ///
-/// The request must carry the Firebase ID token — the server grants to the
-/// authenticated uid, never to a uid supplied in the body.
+/// `succeeds: false` produces the "you were charged, we're still unlocking"
+/// state — the one path that's otherwise hard to reach on purpose.
+struct StubRedeemer: PurchaseRedeeming {
+
+    var succeeds = true
+    var delay: Duration = .milliseconds(600)
+
+    func redeem(signedTransaction: String, tripId: String) async throws {
+        try? await Task.sleep(for: delay)
+        print("[Redeem] trip=\(tripId) jws=\(signedTransaction.prefix(24))…")
+        if !succeeds { throw URLError(.timedOut) }
+    }
+}

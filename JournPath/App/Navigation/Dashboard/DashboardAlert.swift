@@ -54,13 +54,16 @@ private struct DashboardAlertModifier: ViewModifier {
             case .rename:
                 TextField("Trip name", text: $renameText).onChange(of: renameText) { if renameText.count > 32 { renameText = String(renameText.prefix(32)) } }
                 Button("Save") { onRename(renameText) }.disabled(trip.name == renameText || renameText.isEmpty)
-                    .tint(.brand)
+                    .keyboardShortcut(.defaultAction)
                 Button("Cancel", role: .cancel) {}
             case .leave:
-                Button("Leave", role: .destructive, action: onLeave)
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel") {}
+                    .keyboardShortcut(.defaultAction)
+                Button("Leave") { onLeave() }
+
             case .upgraded, .error:
                 Button("OK", role: .cancel) {}
+                    .keyboardShortcut(.defaultAction)
             }
         } message: { current in
             if let message = current.message { Text(message) }
