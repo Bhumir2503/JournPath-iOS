@@ -23,7 +23,7 @@ struct APIRedeemer: PurchaseRedeeming {
     /// server grants to the authenticated uid, never to one in the body.
     func redeem(signedTransaction: String, tripId: String) async throws {
         _ = try await APIClient.shared.post(
-            "/purchase/redeem",
+            "/purchase/apple",
             body: [
                 "signedTransaction": signedTransaction,
                 "tripId": tripId,

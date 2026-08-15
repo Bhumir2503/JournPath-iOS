@@ -253,6 +253,7 @@ final class PurchaseService {
                 tripId: tripID
             )
         } catch {
+            print("[Purchases] Redeem failed: \(error)")
             throw RedeemError.serverRejected
         }
 
