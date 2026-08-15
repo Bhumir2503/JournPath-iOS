@@ -1,143 +1,148 @@
 import Combine
-import FirebaseAppCheck
-import FirebaseAuth
 import Foundation
 import SwiftUI
 
 @MainActor
-class UnsplashImagePickerViewModel: ObservableObject {
-    @Published var searchText: String
-    @Published var images: [UnsplashImage] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String? = nil
-    @Published var errorImage: String = "x.circle"
-    @Published var currentPage: Int = 1
-    @Published var hasMorePages: Bool = true
-    @Published var isFetchingMore: Bool = false
+final class UnsplashImagePickerViewModel: ObservableObject {
 
+    @Published var searchText: String
+    @Published private(set) var images: [UnsplashImage] = []
+    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var isFetchingMore: Bool = false
+    @Published private(set) var errorMessage: String? = nil
+    @Published private(set) var errorImage: String = "x.circle"
+    @Published private(set) var hasMorePages: Bool = true
+
+    /// Unsplash search relevance falls off a cliff past this point.
+    private let maxPages = 9
+    private let fallbackQuery = "nature"
+
+    private var currentPage = 1
     private var cancellables = Set<AnyCancellable>()
     private var searchTask: Task<Void, Never>?
+
+    /// Incremented on every new search. Any in-flight response carrying an old
+    /// generation is discarded, so a slow page-3 fetch can't append itself to
+    /// the results of a search the user has since replaced.
+    private var generation = 0
 
     init(preSearchText: String) {
         self.searchText = preSearchText
 
         $searchText
             .dropFirst()
-            .debounce(for: .seconds(0.8), scheduler: RunLoop.main)
+            .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
             .removeDuplicates()
             .sink { [weak self] query in
-                guard let self = self else { return }
-                self.searchTask?.cancel()
-                self.searchTask = Task {
-                    await self.searchImages(query: query, page: 1)
-                }
+                self?.startSearch(query: query)
             }
             .store(in: &cancellables)
     }
 
-    func loadMore() async {
-        guard !isFetchingMore && hasMorePages && !isLoading else { return }
-        isFetchingMore = true
-        currentPage += 1
-        await searchImages(query: searchText, page: currentPage)
-        isFetchingMore = false
+    deinit {
+        searchTask?.cancel()
     }
 
-    func searchImages(query: String, page: Int = 1) async {
-        let trimmed = query.trimmed
-        let trimmedQuery = trimmed.isBlank ? "nature" : trimmed
+    // MARK: - Entry points
 
-        if page == 1 {
-            isLoading = true
-            errorMessage = nil
-            currentPage = 1
-            hasMorePages = true
+    /// Call from `.task` / `.onAppear` so the pre-filled term loads once.
+    func onAppear() {
+        guard images.isEmpty, !isLoading else { return }
+        startSearch(query: searchText)
+    }
+
+    func retry() {
+        startSearch(query: searchText)
+    }
+
+    private func startSearch(query: String) {
+        searchTask?.cancel()
+        searchTask = Task { [weak self] in
+            await self?.performSearch(query: query)
         }
+    }
 
-        defer { if page == 1 { isLoading = false } }
-        if Task.isCancelled { return }
+    // MARK: - Fetching
 
-        guard let url = buildURL(query: trimmedQuery, page: page) else { return }
+    private func performSearch(query: String) async {
+        generation += 1
+        let gen = generation
 
-        // 1. Create Request with aggressive caching policy
-        var request = URLRequest(url: url)
-        request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        isLoading = true
+        errorMessage = nil
+        currentPage = 1
+        hasMorePages = true
 
-        // 2. Token Management
-        // We attempt to get tokens, but we don't 'return' immediately if they fail,
-        // because the URLCache might already have the data we need.
-        let idToken = try? await Auth.auth().currentUser?.getIDToken()
-        let appCheckToken = try? await AppCheck.appCheck().token(forcingRefresh: false)
-
-        if let idToken = idToken {
-            request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-        }
-        if let acToken = appCheckToken?.token {
-            request.setValue(acToken, forHTTPHeaderField: "X-Firebase-AppCheck")
-        }
+        defer { if gen == generation { isLoading = false } }
 
         do {
-            // 3. Perform Network Call
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if Task.isCancelled { return }
+            let results = try await fetch(query: query, page: 1)
+            guard gen == generation, !Task.isCancelled else { return }
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw URLError(.badServerResponse)
-            }
-
-            // 4. Handle Token Expiration (401)
-            if httpResponse.statusCode == 401 {
-                print("[Unsplash] Token expired, retrying with fresh tokens...")
-                let refreshedAC = try? await AppCheck.appCheck().token(forcingRefresh: true)
-                request.setValue(refreshedAC?.token, forHTTPHeaderField: "X-Firebase-AppCheck")
-
-                let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
-                try handleSuccess(data: retryData, response: retryResponse, page: page)
-            } else if (200...299).contains(httpResponse.statusCode) {
-                try handleSuccess(data: data, response: response, page: page)
-            } else {
-                throw URLError(.cannotParseResponse)
-            }
+            images = results
+            hasMorePages = !results.isEmpty && maxPages > 1
 
         } catch {
-            if !Task.isCancelled {
-                // Only show error if we have NO images to show (i.e., cache was also empty)
-                if page == 1 && images.isEmpty {
-                    self.errorMessage = "Unable to load images. Please check your connection."
-                }
-                print("[Unsplash] Error: \(error.localizedDescription)")
-            }
-        }
-    }
+            // A cancelled request surfaces as an error too - never show that.
+            guard gen == generation, !Task.isCancelled else { return }
 
-    // MARK: - Helpers
-
-    private func buildURL(query: String, page: Int) -> URL? {
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        return URL(string: "https://api.bhumir.com/unsplash/search?q=\(encodedQuery)&page=\(page)")
-    }
-
-    private func handleSuccess(data: Data, response: URLResponse, page: Int) throws {
-        let unsplashResponse = try JSONDecoder().decode(UnsplashResponse.self, from: data)
-        let results = unsplashResponse.results
-
-        if results.isEmpty {
+            images = []
             hasMorePages = false
-            if page == 1 { self.images = [] }
-            return
+            apply(error)
         }
+    }
 
-        if page == 1 {
-            self.images = results
+    func loadMore() async {
+        guard !isLoading, !isFetchingMore, hasMorePages, currentPage < maxPages else { return }
+
+        let gen = generation
+        let nextPage = currentPage + 1
+
+        isFetchingMore = true
+        defer { if gen == generation { isFetchingMore = false } }
+
+        do {
+            let results = try await fetch(query: searchText, page: nextPage)
+            guard gen == generation, !Task.isCancelled else { return }
+
+            // Unsplash repeats photos across pages often enough to matter -
+            // duplicate ids would break ForEach's identity.
+            let existing = Set(images.map(\.id))
+            images.append(contentsOf: results.filter { !existing.contains($0.id) })
+
+            // Only advance on success, so a failed page is retried rather than skipped.
+            currentPage = nextPage
+            hasMorePages = !results.isEmpty && nextPage < maxPages
+
+        } catch {
+            guard gen == generation, !Task.isCancelled else { return }
+            // Keep the existing results on screen; the next scroll retries this page.
+            print("[Unsplash] loadMore page \(nextPage) failed: \(error)")
+        }
+    }
+
+    private func fetch(query: String, page: Int) async throws(APIError) -> [UnsplashImage] {
+        let trimmed = query.trimmed
+        let term = trimmed.isBlank ? fallbackQuery : trimmed
+
+        let response = try await APIClient.shared.get(
+            "image/search",
+            query: ["query": term, "page": page],
+            as: UnsplashResponse.self
+        )
+        return response.results
+    }
+
+    // MARK: - Errors
+
+    private func apply(_ error: APIError) {
+        if case .noInternetConnection = error {
+            errorMessage = "You're offline. Check your connection and try again."
+            errorImage = "wifi.slash"
         } else {
-            let existingIds = Set(self.images.map { $0.id })
-            let filtered = results.filter { !existingIds.contains($0.id) }
-            self.images.append(contentsOf: filtered)
+            errorMessage = "Something went wrong loading images. Please try again."
+            errorImage = "x.circle"
         }
-
-        if results.count < 20 || page >= 9 {
-            hasMorePages = false
-        }
+        print("[Unsplash] \(error)")
     }
 }

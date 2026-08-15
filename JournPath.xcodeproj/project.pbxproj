@@ -16,6 +16,8 @@
 		15396C5F2F2B00C800D360EF /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 15396C5E2F2B00C800D360EF /* FirebaseFunctions */; };
 		15396C612F2B00C800D360EF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 15396C602F2B00C800D360EF /* FirebaseStorage */; };
 		15396C642F2B00F500D360EF /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 15396C632F2B00F500D360EF /* Lottie */; };
+		156EE1F6302C07CB00CE6EEA /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156EE1F5302C07CB00CE6EEA /* StoreKit.framework */; };
+		15834F1F302FA0D200FE6F8A /* JournPath.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 15834F1E302FA0D200FE6F8A /* JournPath.storekit */; };
 		1591BCA12FAC20AF00BA9716 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 1591BCA02FAC20AF00BA9716 /* FirebaseAppCheck */; };
 		1591BCA32FAC20F400BA9716 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1591BCA22FAC20F400BA9716 /* FirebaseAnalytics */; };
 		15C9985B2FF9BEEE00591279 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 15C9985A2FF9BEEE00591279 /* GoogleSignIn */; };
@@ -23,6 +25,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		156EE1F5302C07CB00CE6EEA /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		15834F1E302FA0D200FE6F8A /* JournPath.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = JournPath.storekit; path = JournPath/JournPath.storekit; sourceTree = "<group>"; };
 		15A0E1792EED07700040C430 /* JournPath.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JournPath.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1591BCA12FAC20AF00BA9716 /* FirebaseAppCheck in Frameworks */,
+				156EE1F6302C07CB00CE6EEA /* StoreKit.framework in Frameworks */,
 				15396C592F2B00C800D360EF /* FirebaseAuth in Frameworks */,
 				1591BCA32FAC20F400BA9716 /* FirebaseAnalytics in Frameworks */,
 				15396C5B2F2B00C800D360EF /* FirebaseDatabase in Frameworks */,
@@ -71,10 +76,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		156EE1F4302C07CB00CE6EEA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				156EE1F5302C07CB00CE6EEA /* StoreKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		15A0E1702EED07700040C430 = {
 			isa = PBXGroup;
 			children = (
+				15834F1E302FA0D200FE6F8A /* JournPath.storekit */,
 				15A0E17B2EED07700040C430 /* JournPath */,
+				156EE1F4302C07CB00CE6EEA /* Frameworks */,
 				15A0E17A2EED07700040C430 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -172,6 +187,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				15834F1F302FA0D200FE6F8A /* JournPath.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -320,7 +336,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 4AKB7ZA2M9;
+				DEVELOPMENT_TEAM = HJ38J55HQM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = JournPath/Info.plist;
@@ -363,7 +379,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 4AKB7ZA2M9;
+				DEVELOPMENT_TEAM = HJ38J55HQM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = JournPath/Info.plist;

@@ -22,7 +22,6 @@ struct ActivityFormView: View {
                 ActivityFormDateCard(trip: trip, destinationTimeZone: vm.place.timeZone!, startDate: $vm.startDate, endDate: $vm.endDate, allDay: $vm.allDay)
                 PlaceInfoCard(place: vm.place)
                 NotesCard(note: $vm.note)
-                StorageCard(pendingAttachments: vm.pendingAttachments)
             }
             .padding(.horizontal)
             .padding(.bottom, 24)

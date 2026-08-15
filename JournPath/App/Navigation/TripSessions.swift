@@ -1,0 +1,29 @@
+final class TripSession {
+    let tripId: String
+    var trip: TripStore
+    var participants: ParticipantStore
+    var storage: StorageStore
+
+    init(tripId: String, uid: String) {
+        self.tripId = tripId
+        self.trip = TripStore(tripId: tripId)
+        self.participants = ParticipantStore(tripId: tripId)
+        self.storage = StorageStore(tripId: tripId, uid: uid)
+    }
+
+    deinit {
+        stop()
+    }
+
+    func start() {
+        trip.start()
+        participants.start()
+        storage.start()
+    }
+
+    func stop() {
+        trip.stop()
+        participants.stop()
+        storage.stop()
+    }
+}

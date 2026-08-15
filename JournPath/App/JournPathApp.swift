@@ -1,14 +1,13 @@
+import Firebase
 //  MyJourneyApp.swift
 //  MyJourney
 //
 //  Created by Bhumir Patel on 12/12/25.
 //
 import FirebaseAppCheck
-import Firebase
+import GoogleSignIn
 import Kingfisher
 import SwiftUI
-import GoogleSignIn
-
 
 @MainActor
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -35,9 +34,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         FirebaseConfiguration.shared.setLoggerLevel(.error)
 
+        // Starts the Transaction.updates listener and sweeps anything left
+        // unfinished from a previous session. Must run for the whole app
+        // lifetime, and after Firebase — redemption needs an auth token.
+        PurchaseService.shared.start()
 
         // Configure Kingfisher Cache (Max 500MB disk space)
-        ImageCache.default.diskStorage.config.sizeLimit = 500 * 1024 * 1024
+        ImageCache.default.diskStorage.config.sizeLimit = 100 * 1024 * 1024
 
         return true
     }
