@@ -173,7 +173,7 @@ struct PaywallView: View {
         HStack(spacing: 6) {
             // The placeholder only shows for the instant before products
             // land; the button stays disabled until the real price arrives.
-            Text(purchases.tripUnlockPrice ?? "$5.99")
+            Text(purchases.tripUnlockPrice ?? "loading...")
                 .font(.subheadline.bold())
                 .foregroundStyle(.primary)
                 .redacted(reason: purchases.tripUnlockPrice == nil ? .placeholder : [])

@@ -115,6 +115,7 @@ final class PurchaseService {
         phase = .loadingProducts
         do {
             products = try await Product.products(for: ProductID.all)
+            print("[Purchases] asked \(ProductID.all) → got \(products.map(\.id))")
             phase = products.isEmpty ? .failed(.productsUnavailable) : .idle
         } catch {
             phase = .failed(.network)
