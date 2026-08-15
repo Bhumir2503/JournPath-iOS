@@ -12,8 +12,8 @@ protocol PurchaseRedeeming {
     ///   - signedTransaction: The JWS representation, sent raw. The server
     ///     verifies Apple's signature itself; a client-decoded transaction
     ///     is trivially forgeable.
-    ///   - tripId: The trip to unlock. Required by `/purchase/redeem`.
-    func redeem(signedTransaction: String, tripId: String) async throws
+    ///   - tripID: The trip to unlock. Required by `/purchase/redeem`.
+    func redeem(signedTransaction: String, tripID: String) async throws
 }
 
 // MARK: - Real implementation
@@ -21,12 +21,12 @@ protocol PurchaseRedeeming {
 struct APIRedeemer: PurchaseRedeeming {
     /// The request carries the Firebase ID token via `APIClient` — the
     /// server grants to the authenticated uid, never to one in the body.
-    func redeem(signedTransaction: String, tripId: String) async throws {
+    func redeem(signedTransaction: String, tripID: String) async throws {
         _ = try await APIClient.shared.post(
             "/purchase/apple",
             body: [
                 "signedTransaction": signedTransaction,
-                "tripId": tripId,
+                "tripId": tripID,
             ]
         )
     }
@@ -43,9 +43,9 @@ struct StubRedeemer: PurchaseRedeeming {
     var succeeds = true
     var delay: Duration = .milliseconds(600)
 
-    func redeem(signedTransaction: String, tripId: String) async throws {
+    func redeem(signedTransaction: String, tripID: String) async throws {
         try? await Task.sleep(for: delay)
-        print("[Redeem] trip=\(tripId) jws=\(signedTransaction.prefix(24))…")
+        print("[Redeem] trip=\(tripID) jws=\(signedTransaction.prefix(24))…")
         if !succeeds { throw URLError(.timedOut) }
     }
 }

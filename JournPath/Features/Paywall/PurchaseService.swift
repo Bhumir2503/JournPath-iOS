@@ -250,7 +250,7 @@ final class PurchaseService {
         do {
             try await redeemer.redeem(
                 signedTransaction: result.jwsRepresentation,
-                tripId: tripID
+                tripID: tripID
             )
         } catch {
             print("[Purchases] Redeem failed: \(error)")
