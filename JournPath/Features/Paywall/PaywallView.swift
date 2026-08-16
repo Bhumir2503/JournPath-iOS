@@ -1,42 +1,6 @@
 import Lottie
 import SwiftUI
 
-// MARK: - State
-
-/// Everything the sheet needs to know about what's happening.
-/// Derived from `PurchaseService.phase` — see `paywallState`.
-enum PaywallState: Equatable {
-
-    /// Product metadata hasn't arrived from the App Store yet.
-    case loading
-
-    /// Ready to buy.
-    case ready
-
-    /// Apple's payment sheet is up. The user can still back out.
-    case purchasing
-
-    /// Paid. Recording the grant. The sheet must not be dismissible here.
-    case confirming
-
-    /// Ask to Buy — approval may arrive minutes or days later.
-    case awaitingApproval
-
-    /// `paymentTaken` distinguishes "the purchase failed" from "you were
-    /// charged but we haven't finished unlocking yet". They read very
-    /// differently to a customer and must not look the same.
-    case failed(message: String, paymentTaken: Bool)
-
-    var isBusy: Bool {
-        switch self {
-        case .loading, .purchasing, .confirming: true
-        default: false
-        }
-    }
-}
-
-// MARK: - Sheet
-
 struct PaywallView: View {
 
     @Environment(TripStore.self) private var trip
@@ -45,16 +9,10 @@ struct PaywallView: View {
     private let purchases = PurchaseService.shared
 
     var termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    var privacyURL = URL(string: "https://journpath.com/privacy")!
+    var privacyURL = URL(string: "https://bentertainment.co/privacy")!
 
-    /// Single source of truth. Deliberately computed — a `@State` copy
-    /// would freeze at its initial value and never track the service.
     private var state: PaywallState { purchases.paywallState(for: trip.tripId) }
-
-    /// Only a total failure to load products gets the full-screen
-    /// treatment. Every other failure is recoverable inline, and replacing
-    /// the sheet would throw away the message the customer needs to read —
-    /// including "your payment went through".
+    
     private var cantLoadProducts: Bool {
         guard purchases.tripUnlockPrice == nil else { return false }
         switch purchases.phase {
@@ -71,8 +29,6 @@ struct PaywallView: View {
                 mainContentView
             }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
         .interactiveDismissDisabled(state.isBusy)
         .task {
             if purchases.tripUnlockPrice == nil {

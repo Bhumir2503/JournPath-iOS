@@ -459,7 +459,7 @@
             defer { isScanning = false }
             let target = url
             nodes = await Task.detached(priority: .userInitiated) {
-                ContainerScanner.children(of: target)
+                await ContainerScanner.children(of: target)
             }.value
         }
     }
@@ -537,8 +537,8 @@
                 // Binary: hex dump the first 128 bytes. Magic numbers are usually
                 // enough — FFD8FF is JPEG, 25504446 is %PDF, 89504E47 is PNG.
                 let hexStrings = data.prefix(128).map { String(format: "%02X", $0) }
-                let pairs = hexStrings.chunked(into: 2).map { $0.joined() }
-                let lines = pairs.chunked(into: 16).map { $0.joined(separator: " ") }
+                let pairs = await hexStrings.chunked(into: 2).map { $0.joined() }
+                let lines = await pairs.chunked(into: 16).map { $0.joined(separator: " ") }
                 return lines.joined(separator: "\n")
             }.value
         }

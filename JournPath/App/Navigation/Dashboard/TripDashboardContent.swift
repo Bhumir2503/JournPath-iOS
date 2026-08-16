@@ -34,6 +34,12 @@ struct TripDashboardContent: View {
             .onChange(of: participants.me?.status) { _, status in
                 if status == .kicked { purgeCaches() }
             }
+            .onChange(of: tripStore.tier){ oldTier, newTier in
+                if (oldTier == .free && newTier == .premium ){
+                    activeSheet = nil
+                    activeAlert = .upgraded
+                }
+            }
     }
 
     @ViewBuilder
