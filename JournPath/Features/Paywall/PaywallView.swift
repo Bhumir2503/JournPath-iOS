@@ -6,34 +6,19 @@ struct PaywallView: View {
     @Environment(TripStore.self) private var trip
     @Environment(\.dismiss) private var dismiss
 
-    private let purchases = PurchaseService.shared
-
-    var termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    var privacyURL = URL(string: "https://bentertainment.co/privacy")!
-
-    private var state: PaywallState { purchases.paywallState(for: trip.tripId) }
-    
-    private var cantLoadProducts: Bool {
-        guard purchases.tripUnlockPrice == nil else { return false }
-        switch purchases.phase {
-        case .failed(.productsUnavailable), .failed(.network): return true
-        default: return false
-        }
-    }
+    @State private var vm = PaywallVM()
 
     var body: some View {
         Group {
-            if cantLoadProducts {
+            if vm.cantLoadProducts {
                 loadFailedView
             } else {
                 mainContentView
             }
         }
-        .interactiveDismissDisabled(state.isBusy)
-        .task {
-            if purchases.tripUnlockPrice == nil {
-                await purchases.loadProducts()
-            }
+        .interactiveDismissDisabled(vm.isDismissDisabled)
+        .task(id: trip.tripId) {
+            await vm.onAppear(tripID: trip.tripId)
         }
     }
 
@@ -68,7 +53,7 @@ struct PaywallView: View {
             }
 
             Button {
-                Task { await purchases.loadProducts() }
+                Task { await vm.retryLoadProducts() }
             } label: {
                 Text("Retry")
                     .font(.headline)
@@ -107,7 +92,7 @@ struct PaywallView: View {
 
     @ViewBuilder
     private var statusLine: some View {
-        switch state {
+        switch vm.state {
         case .awaitingApproval:
             NoticeText(
                 "Waiting for approval. The trip unlocks as soon as it's approved.",
@@ -129,10 +114,10 @@ struct PaywallView: View {
         HStack(spacing: 6) {
             // The placeholder only shows for the instant before products
             // land; the button stays disabled until the real price arrives.
-            Text(purchases.tripUnlockPrice ?? "loading...")
+            Text(vm.tripUnlockPrice ?? "loading...")
                 .font(.subheadline.bold())
                 .foregroundStyle(.primary)
-                .redacted(reason: purchases.tripUnlockPrice == nil ? .placeholder : [])
+                .redacted(reason: vm.isPriceLoading ? .placeholder : [])
             Text("once, for the whole group")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -142,13 +127,13 @@ struct PaywallView: View {
 
     private var purchaseButton: some View {
         AsyncIconTextButton(
-            title: "UPGRADE THIS TRIP",
-            isDisabled: state.isBusy || purchases.tripUnlockPrice == nil,
+            title: vm.buttonTitle,
+            isDisabled: vm.isPurchaseDisabled,
             textColor: Color(.systemBackground),
             buttonColor: Color.primary,
             successColor: Color.primary,
             action: {
-                try await purchases.purchaseTripUnlock(for: trip.tripId)
+                try await vm.purchaseTripUnlock()
             },
             closingAction: {
                 dismiss()
@@ -160,16 +145,16 @@ struct PaywallView: View {
     private var legalRow: some View {
         HStack(spacing: 10) {
             Button("Restore") {
-                Task { await purchases.restore() }
+                Task { await vm.restore() }
             }
             Text("•")
-            Link("Terms", destination: termsURL)
+            Link("Terms", destination: vm.termsURL)
             Text("•")
-            Link("Privacy", destination: privacyURL)
+            Link("Privacy", destination: vm.privacyURL)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .disabled(state.isBusy)
+        .disabled(vm.isDismissDisabled)
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
     }
