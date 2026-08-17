@@ -17,7 +17,6 @@
 		15396C612F2B00C800D360EF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 15396C602F2B00C800D360EF /* FirebaseStorage */; };
 		15396C642F2B00F500D360EF /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 15396C632F2B00F500D360EF /* Lottie */; };
 		156EE1F6302C07CB00CE6EEA /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156EE1F5302C07CB00CE6EEA /* StoreKit.framework */; };
-		15834F1F302FA0D200FE6F8A /* JournPath.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 15834F1E302FA0D200FE6F8A /* JournPath.storekit */; };
 		1591BCA12FAC20AF00BA9716 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 1591BCA02FAC20AF00BA9716 /* FirebaseAppCheck */; };
 		1591BCA32FAC20F400BA9716 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1591BCA22FAC20F400BA9716 /* FirebaseAnalytics */; };
 		15C9985B2FF9BEEE00591279 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 15C9985A2FF9BEEE00591279 /* GoogleSignIn */; };
@@ -148,7 +147,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					15A0E1782EED07700040C430 = {
 						CreatedOnToolsVersion = 26.1.1;
@@ -187,7 +186,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				15834F1F302FA0D200FE6F8A /* JournPath.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

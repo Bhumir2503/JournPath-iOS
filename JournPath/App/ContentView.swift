@@ -21,18 +21,21 @@ struct ContentView: View {
     @State private var deepLinkError: AnyAppError? = nil
 
     private var deepLinkService = DeepLinkService()
+    
+    @State private var showSplash = true
 
     var body: some View {
-        Group {
-            switch session.state {
-            case .loading:
-                EmptyView()
-            case .loggedIn:
-                mainContent
-            case .loggedOut:
-                SignInView()
+        ZStack {
+            Group {
+                switch session.state {
+                case .loading:
+                    Color(UIColor.systemBackground).ignoresSafeArea()
+                case .loggedIn:
+                    mainContent
+                case .loggedOut:
+                    SignInView()
+                }
             }
-        }
         .onOpenURL { url in
             if let deepLink = deepLinkService.handle(url: url) {
                 pendingTripId = deepLink.tripId
@@ -44,11 +47,33 @@ struct ContentView: View {
             if oldState != .loading && newState == .loggedIn {
                 processDeepLinking()
             }
+            checkSplashDismissal()
         }
         .environment(session)
         .environment(uploads)
         .overlay { joiningTripOverlay }
         .alert(error: $deepLinkError)
+
+            if showSplash {
+                SplashScreenView()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .onAppear {
+            checkSplashDismissal()
+        }
+    }
+    
+    private func checkSplashDismissal() {
+        if session.state != .loading {
+            Task {
+                try? await Task.sleep(for: .seconds(0.2))
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    showSplash = false
+                }
+            }
+        }
     }
 }
 
