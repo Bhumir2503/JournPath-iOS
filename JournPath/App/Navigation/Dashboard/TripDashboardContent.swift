@@ -36,6 +36,11 @@ struct TripDashboardContent: View {
             }
             .onChange(of: tripStore.tier){ oldTier, newTier in
                 if (oldTier == .free && newTier == .premium ){
+                    // Prevent showing the alert if it's already visible
+                    let seenKey = "hasSeenUpgradeAlert_\(tripStore.tripId)"
+                    if activeAlert == .upgraded || UserDefaults.standard.bool(forKey: seenKey) { return }
+                    
+                    UserDefaults.standard.set(true, forKey: seenKey)
                     activeSheet = nil
                     activeAlert = .upgraded
                 }
