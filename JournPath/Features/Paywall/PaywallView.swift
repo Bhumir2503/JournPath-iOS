@@ -1,83 +1,24 @@
 import Lottie
 import SwiftUI
 
-// MARK: - State
-
-/// Everything the sheet needs to know about what's happening.
-/// Derived from `PurchaseService.phase` — see `paywallState`.
-enum PaywallState: Equatable {
-
-    /// Product metadata hasn't arrived from the App Store yet.
-    case loading
-
-    /// Ready to buy.
-    case ready
-
-    /// Apple's payment sheet is up. The user can still back out.
-    case purchasing
-
-    /// Paid. Recording the grant. The sheet must not be dismissible here.
-    case confirming
-
-    /// Ask to Buy — approval may arrive minutes or days later.
-    case awaitingApproval
-
-    /// `paymentTaken` distinguishes "the purchase failed" from "you were
-    /// charged but we haven't finished unlocking yet". They read very
-    /// differently to a customer and must not look the same.
-    case failed(message: String, paymentTaken: Bool)
-
-    var isBusy: Bool {
-        switch self {
-        case .loading, .purchasing, .confirming: true
-        default: false
-        }
-    }
-}
-
-// MARK: - Sheet
-
 struct PaywallView: View {
 
     @Environment(TripStore.self) private var trip
     @Environment(\.dismiss) private var dismiss
 
-    private let purchases = PurchaseService.shared
-
-    var termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    var privacyURL = URL(string: "https://journpath.com/privacy")!
-
-    /// Single source of truth. Deliberately computed — a `@State` copy
-    /// would freeze at its initial value and never track the service.
-    private var state: PaywallState { purchases.paywallState(for: trip.tripId) }
-
-    /// Only a total failure to load products gets the full-screen
-    /// treatment. Every other failure is recoverable inline, and replacing
-    /// the sheet would throw away the message the customer needs to read —
-    /// including "your payment went through".
-    private var cantLoadProducts: Bool {
-        guard purchases.tripUnlockPrice == nil else { return false }
-        switch purchases.phase {
-        case .failed(.productsUnavailable), .failed(.network): return true
-        default: return false
-        }
-    }
+    @State private var vm = PaywallVM()
 
     var body: some View {
         Group {
-            if cantLoadProducts {
+            if vm.cantLoadProducts {
                 loadFailedView
             } else {
                 mainContentView
             }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(state.isBusy)
-        .task {
-            if purchases.tripUnlockPrice == nil {
-                await purchases.loadProducts()
-            }
+        .interactiveDismissDisabled(vm.isDismissDisabled)
+        .task(id: trip.tripId) {
+            await vm.onAppear(tripID: trip.tripId)
         }
     }
 
@@ -112,7 +53,7 @@ struct PaywallView: View {
             }
 
             Button {
-                Task { await purchases.loadProducts() }
+                Task { await vm.retryLoadProducts() }
             } label: {
                 Text("Retry")
                     .font(.headline)
@@ -151,7 +92,7 @@ struct PaywallView: View {
 
     @ViewBuilder
     private var statusLine: some View {
-        switch state {
+        switch vm.state {
         case .awaitingApproval:
             NoticeText(
                 "Waiting for approval. The trip unlocks as soon as it's approved.",
@@ -173,10 +114,10 @@ struct PaywallView: View {
         HStack(spacing: 6) {
             // The placeholder only shows for the instant before products
             // land; the button stays disabled until the real price arrives.
-            Text(purchases.tripUnlockPrice ?? "loading...")
+            Text(vm.tripUnlockPrice ?? "loading...")
                 .font(.subheadline.bold())
                 .foregroundStyle(.primary)
-                .redacted(reason: purchases.tripUnlockPrice == nil ? .placeholder : [])
+                .redacted(reason: vm.isPriceLoading ? .placeholder : [])
             Text("once, for the whole group")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -186,13 +127,13 @@ struct PaywallView: View {
 
     private var purchaseButton: some View {
         AsyncIconTextButton(
-            title: "UPGRADE THIS TRIP",
-            isDisabled: state.isBusy || purchases.tripUnlockPrice == nil,
+            title: vm.buttonTitle,
+            isDisabled: vm.isPurchaseDisabled,
             textColor: Color(.systemBackground),
             buttonColor: Color.primary,
             successColor: Color.primary,
             action: {
-                try await purchases.purchaseTripUnlock(for: trip.tripId)
+                try await vm.purchaseTripUnlock()
             },
             closingAction: {
                 dismiss()
@@ -204,16 +145,16 @@ struct PaywallView: View {
     private var legalRow: some View {
         HStack(spacing: 10) {
             Button("Restore") {
-                Task { await purchases.restore() }
+                Task { await vm.restore() }
             }
             Text("•")
-            Link("Terms", destination: termsURL)
+            Link("Terms", destination: vm.termsURL)
             Text("•")
-            Link("Privacy", destination: privacyURL)
+            Link("Privacy", destination: vm.privacyURL)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .disabled(state.isBusy)
+        .disabled(vm.isDismissDisabled)
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
     }

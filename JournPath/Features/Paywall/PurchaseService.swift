@@ -49,7 +49,10 @@ final class PurchaseService {
         /// Whether the customer's card was charged. Drives both the wording
         /// and the styling — a charged-but-unfinished purchase must not look
         /// like a failure, or people buy a second time.
-        nonisolated var paymentTaken: Bool { self == .recordingFailed }
+        nonisolated var paymentTaken: Bool {
+            if case .recordingFailed = self { return true }
+            return false
+        }
 
         nonisolated var message: String {
             switch self {
@@ -250,7 +253,7 @@ final class PurchaseService {
         do {
             try await redeemer.redeem(
                 signedTransaction: result.jwsRepresentation,
-                tripId: tripID
+                tripID: tripID
             )
         } catch {
             print("[Purchases] Redeem failed: \(error)")
