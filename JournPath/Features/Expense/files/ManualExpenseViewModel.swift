@@ -125,11 +125,9 @@ final class ManualExpenseViewModel {
         case .equal:
             if equalParticipants.isEmpty { equalParticipants = Set(participantIds) }
         case .percentage:
-            if percentBp.isEmpty { percentBp = evenBasisPoints() }
+            percentBp = [:]
         case .exact:
-            // Seed from whatever the previous type produced, so switching to
-            // exact starts from the current allocation rather than blank.
-            if exactSplits.isEmpty { exactSplits = splits }
+            exactSplits = [:]
         }
         syncSplitsToIntent()
     }
