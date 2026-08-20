@@ -79,6 +79,7 @@ struct ManualExpenseContentView: View {
 
             VStack(spacing: 0) {
                 Button {
+                    vm.padAmountTextIfNeeded()
                     withAnimation { isReviewing = true }
                 } label: {
                     Text("Continue")

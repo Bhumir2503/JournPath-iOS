@@ -78,6 +78,21 @@ final class ManualExpenseViewModel {
         Money.formatted(minor, currency: selectedCurrency)
     }
 
+    func padAmountTextIfNeeded() {
+        guard currencyExponent > 0 else { return }
+        let parts = amountText.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 2 {
+            let fraction = parts[1]
+            if fraction.isEmpty {
+                // "25." -> "25"
+                amountText = String(parts[0])
+            } else if fraction.count < currencyExponent {
+                // "25.1" -> "25.10"
+                amountText += String(repeating: "0", count: currencyExponent - fraction.count)
+            }
+        }
+    }
+
     // MARK: - Split derivation
 
     /// Recompute `splits` whenever anything it depends on changes.

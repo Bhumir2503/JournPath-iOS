@@ -9,20 +9,21 @@ public struct PercentageInputView: View {
     var onDone: (() -> Void)? = nil
 
     @State private var invalidAttempts: Int = 0
+    @State private var localText: String = ""
 
     // MARK: - Amount display
 
     private var formattedAmount: String {
-        guard !text.isEmpty else { return "0" }
-        return text
+        guard !localText.isEmpty else { return "0" }
+        return localText
     }
 
     private var isSaveDisabled: Bool {
-        text.isEmpty || text == "0" || isOverLimit
+        localText.isEmpty || localText == "0" || isOverLimit
     }
 
     private var isOverLimit: Bool {
-        guard let limit = limit, let val = Double(text) else { return false }
+        guard let limit = limit, let val = Double(localText) else { return false }
         return val > limit
     }
 
@@ -59,6 +60,10 @@ public struct PercentageInputView: View {
                 // Bottom Area (Numpad)
                 VStack(spacing: 0) {
                     Button {
+                        if localText.hasSuffix(".") {
+                            localText = String(localText.dropLast())
+                        }
+                        text = localText
                         if let onDone = onDone {
                             onDone()
                         } else {
@@ -78,8 +83,8 @@ public struct PercentageInputView: View {
                     .disabled(isSaveDisabled)
 
                     NumberPad(
-                        text: $text,
-                        maxFractionDigits: 2,
+                        text: $localText,
+                        maxFractionDigits: 0,
                         limit: limit,
                         onError: { invalidAttempts += 1 }
                     )
@@ -88,13 +93,8 @@ public struct PercentageInputView: View {
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSaveDisabled)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundStyle(.primary)
-                }
+            .onAppear {
+                localText = text
             }
         }
     }

@@ -11,6 +11,7 @@ public struct AmountInputView: View {
     var onDone: (() -> Void)? = nil
 
     @State private var invalidAttempts: Int = 0
+    @State private var localText: String = ""
 
     private let topCurrencies = ["USD", "EUR", "JPY", "GBP", "INR"]
 
@@ -51,9 +52,9 @@ public struct AmountInputView: View {
     // MARK: - Amount display
 
     private var formattedAmount: String {
-        guard !text.isEmpty else { return "0" }
+        guard !localText.isEmpty else { return "0" }
 
-        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
+        let parts = localText.split(separator: ".", omittingEmptySubsequences: false)
         let whole = Int(parts[0]) ?? 0
         let grouped = whole.formatted(.number.grouping(.automatic))
 
@@ -61,11 +62,11 @@ public struct AmountInputView: View {
     }
 
     private var isSaveDisabled: Bool {
-        text.isEmpty || text == "0" || isOverLimit
+        localText.isEmpty || localText == "0" || isOverLimit
     }
 
     private var isOverLimit: Bool {
-        guard let limit = limit, let val = Double(text) else { return false }
+        guard let limit = limit, let val = Double(localText) else { return false }
         return val > limit
     }
 
@@ -102,6 +103,18 @@ public struct AmountInputView: View {
                 // Bottom Area (Numpad)
                 VStack(spacing: 0) {
                     Button {
+                        if maxFractionDigits > 0 {
+                            let parts = localText.split(separator: ".", omittingEmptySubsequences: false)
+                            if parts.count == 2 {
+                                let fraction = parts[1]
+                                if fraction.isEmpty {
+                                    localText = String(parts[0])
+                                } else if fraction.count < maxFractionDigits {
+                                    localText += String(repeating: "0", count: maxFractionDigits - fraction.count)
+                                }
+                            }
+                        }
+                        text = localText
                         if let onDone = onDone {
                             onDone()
                         } else {
@@ -121,7 +134,7 @@ public struct AmountInputView: View {
                     .disabled(isSaveDisabled)
 
                     NumberPad(
-                        text: $text,
+                        text: $localText,
                         maxFractionDigits: maxFractionDigits,
                         limit: limit,
                         onError: { invalidAttempts += 1 }
@@ -131,6 +144,9 @@ public struct AmountInputView: View {
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSaveDisabled)
+            .onAppear {
+                localText = text
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if !isFixedCurrency {
