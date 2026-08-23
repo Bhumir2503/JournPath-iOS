@@ -88,11 +88,15 @@ struct TripDashboardContent: View {
                     TripDashboardHeader(trip: trip, geometry: geometry, scrollOffset: scrollOffset)
                         .offset(y: scrollOffset > 0 ? 0 : scrollOffset)
 
-                    // Each card lives in its own slice.
-                    // NextUpCard { activeSheet = .itineraryBuilder }
-                    // BalanceSummaryCard { activeSheet = .expenses }
-                    // RecentFilesStrip { activeSheet = .storage }
-                    // MemberAvatarRow { activeSheet = .participant }
+                    VStack(spacing: 16) {
+                        // Each card lives in its own slice.
+                        ItineraryListView(tripId: trip.id ?? "")
+                        // NextUpCard { activeSheet = .itineraryBuilder }
+                        // BalanceSummaryCard { activeSheet = .expenses }
+                        // RecentFilesStrip { activeSheet = .storage }
+                        // MemberAvatarRow { activeSheet = .participant }
+                    }
+                    .padding(.top, geometry.size.height * 0.45 - 20)
                 }
                 .padding(.bottom, 32)
             }

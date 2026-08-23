@@ -3,6 +3,7 @@ import SwiftUI
 struct TripDashboardBottomBar: View {
 
     @Environment(ParticipantStore.self) private var participants
+    @Environment(AppRouter.self) private var router
     @Binding var activeSheet: DashboardSheet?
 
     var body: some View {
@@ -14,15 +15,15 @@ struct TripDashboardBottomBar: View {
             }
 
             Button {
-                activeSheet = .expenses
-            } label: {
-                Label("Expenses", systemImage: "dollarsign.circle")
-            }
-
-            Button {
                 activeSheet = .checklist
             } label: {
                 Label("Notes", systemImage: "list.bullet.clipboard")
+            }
+
+            Button {
+                router.navigateToTripMap()
+            } label: {
+                Image(systemName: "map")
             }
 
             Spacer()

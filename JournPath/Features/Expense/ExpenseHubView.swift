@@ -18,6 +18,7 @@ struct ExpenseHubContentView: View {
 
     @State private var showAdd = false
     @State private var selectedCategory: ExpenseCategory?
+    @State private var selectedExpense: Expense?
 
     private let tripId: String
     private let currentUid: String
@@ -94,12 +95,17 @@ struct ExpenseHubContentView: View {
                         }
                     } else {
                         ForEach(filteredExpenses) { expense in
-                            ExpenseRow(
-                                expense: expense,
-                                currentUid: currentUid,
-                                baseCurrency: baseCurrency,
-                                payerName: displayName(for: expense.paidBy)
-                            )
+                            Button {
+                                selectedExpense = expense
+                            } label: {
+                                ExpenseRow(
+                                    expense: expense,
+                                    currentUid: currentUid,
+                                    baseCurrency: baseCurrency,
+                                    payerName: displayName(for: expense.paidBy)
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 } header: {
@@ -126,6 +132,13 @@ struct ExpenseHubContentView: View {
                 ManualExpenseView()
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $selectedExpense) { expense in
+                ExpensePreviewView(
+                    expense: expense,
+                    currentUid: currentUid,
+                    baseCurrency: baseCurrency
+                )
             }
         }
         .presentationDragIndicator(.visible)
