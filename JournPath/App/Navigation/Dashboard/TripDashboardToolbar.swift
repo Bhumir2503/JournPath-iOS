@@ -24,6 +24,13 @@ struct TripDashboardToolbar: ToolbarContent {
                 .disabled(true)
             }
 
+            // Map Button
+            Button {
+                router.navigateToTripMap()
+            } label: {
+                Image(systemName: "globe.americas.fill")
+            }
+
             // Command Menu
             TripDashboardMenu(
                 activeSheet: $activeSheet,

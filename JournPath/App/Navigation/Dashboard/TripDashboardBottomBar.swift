@@ -15,15 +15,15 @@ struct TripDashboardBottomBar: View {
             }
 
             Button {
-                activeSheet = .checklist
+                activeSheet = .expenses
             } label: {
-                Label("Notes", systemImage: "list.bullet.clipboard")
+                Label("Expenses", systemImage: "dollarsign.circle")
             }
 
             Button {
-                router.navigateToTripMap()
+                activeSheet = .checklist
             } label: {
-                Image(systemName: "map")
+                Label("Notes", systemImage: "list.bullet.clipboard")
             }
 
             Spacer()
