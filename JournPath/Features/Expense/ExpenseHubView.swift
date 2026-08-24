@@ -137,7 +137,12 @@ struct ExpenseHubContentView: View {
                 ExpensePreviewView(
                     expense: expense,
                     currentUid: currentUid,
-                    baseCurrency: baseCurrency
+                    baseCurrency: baseCurrency,
+                    onDelete: {
+                        if let id = expense.id {
+                            ExpenseService().delete(id: id, in: tripId)
+                        }
+                    }
                 )
             }
         }
