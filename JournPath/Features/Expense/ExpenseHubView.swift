@@ -247,9 +247,6 @@ struct ExpenseHubContentView: View {
                     owesMe
                         ? "\(displayName(for: otherUid)) owes you"
                         : "You owe \(displayName(for: otherUid))")
-                Text("Tap to record payment")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()
