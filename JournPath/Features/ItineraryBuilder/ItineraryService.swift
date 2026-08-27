@@ -18,4 +18,11 @@ final class ItineraryService {
         return activityRef.documentID
     }
 
+    func deleteItem(tripId: String, itemId: String) async throws {
+        // First delete any expenses associated with this activity
+        try await ExpenseService().deleteForActivity(activityId: itemId, in: tripId)
+        
+        // Then delete the activity itself
+        try await db.collection("trips").document(tripId).collection("itineraryItems").document(itemId).delete()
+    }
 }

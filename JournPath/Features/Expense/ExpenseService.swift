@@ -168,6 +168,19 @@ struct ExpenseService {
         }
     }
 
+    /// Delete all expenses associated with an activity.
+    func deleteForActivity(activityId: String, in tripId: String) async throws {
+        let snapshot = try await collection(tripId: tripId)
+            .whereField("activityId", isEqualTo: activityId)
+            .getDocuments()
+            
+        let batch = db.batch()
+        for doc in snapshot.documents {
+            batch.deleteDocument(doc.reference)
+        }
+        try await batch.commit()
+    }
+
     // MARK: - Payload
 
     /// Every field the client is allowed to write, and nothing else.

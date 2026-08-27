@@ -24,6 +24,7 @@ struct ItineraryItem: Identifiable, Codable, Hashable {
 
     var notes: String? // Quick Notes, max 1000 char
     var attachments: [String]? // Array of Firestore Document IDs that point to file attachments
+    var expenseId: String? // Optional ID of the expense associated with this item
 
     var activity: ActivityPayload? // if type is activity
 
@@ -44,7 +45,9 @@ struct ItineraryItem: Identifiable, Codable, Hashable {
         endTime: Date,
         allDay: Bool,
         timeZone: TimeZone,
-        note: String
+        note: String,
+        attachments: [String]? = nil,
+        expenseId: String? = nil
     ) -> Self {
         let place = ActivityPayload(mapItem: place)
         return ItineraryItem(
@@ -55,6 +58,8 @@ struct ItineraryItem: Identifiable, Codable, Hashable {
             endTime: endTime,
             timeZoneId: timeZone.identifier,
             notes: note,
+            attachments: attachments,
+            expenseId: expenseId,
             activity: place,
             createdBy: userId
         )

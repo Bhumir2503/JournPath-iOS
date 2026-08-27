@@ -26,7 +26,7 @@ struct TripDashboardToolbar: ToolbarContent {
 
             // Map Button
             Button {
-                router.navigateToTripMap()
+                router.navigateToTripMap(tripId: trip.tripId)
             } label: {
                 Image(systemName: "globe.americas.fill")
             }

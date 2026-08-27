@@ -251,10 +251,10 @@ final class ManualExpenseViewModel {
 
     // MARK: - Save
 
-    func save() -> Bool {
+    func save() -> String? {
         guard canSubmit else {
             invalidAttempts += 1
-            return false
+            return nil
         }
 
         let draft = ExpenseDraft(
@@ -277,12 +277,12 @@ final class ManualExpenseViewModel {
         defer { isSaving = false }
 
         do {
-            try service.create(draft, in: tripId, by: currentUid)
-            return true
+            let id = try service.create(draft, in: tripId, by: currentUid)
+            return id
         } catch {
             saveError = error.localizedDescription
             AppLogger.store.error("Expense save failed: \(error.localizedDescription)")
-            return false
+            return nil
         }
     }
 }

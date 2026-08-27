@@ -1,4 +1,5 @@
 import FirebaseAuth
+import FirebaseFirestore
 import Foundation
 import MapKit
 import PhotosUI
@@ -119,6 +120,7 @@ final class ActivityFormVM {
     }
 
     func saveActivity(tripId: String) async -> Bool {
+        let attachmentIds = pendingFiles.isEmpty ? nil : pendingFiles.map { $0.id }
         let item = ItineraryItem.createActivityItem(
             tripId: tripId,
             userId: Auth.auth().currentUser?.uid ?? "",
@@ -128,7 +130,8 @@ final class ActivityFormVM {
             endTime: endDate,
             allDay: allDay,
             timeZone: place.timeZone!,
-            note: note
+            note: note,
+            attachments: attachmentIds
         )
         do {
             let id = try await service.saveItem(item)
@@ -144,7 +147,12 @@ final class ActivityFormVM {
                 expenseVM.title = activityTitle
                 expenseVM.activityId = id
                 expenseVM.spentAt = startDate
-                _ = expenseVM.save()
+                if let expenseId = expenseVM.save() {
+                    try? await Firestore.firestore()
+                        .collection("trips").document(tripId)
+                        .collection("itineraryItems").document(id)
+                        .updateData(["expenseId": expenseId])
+                }
             }
             return true
         } catch {

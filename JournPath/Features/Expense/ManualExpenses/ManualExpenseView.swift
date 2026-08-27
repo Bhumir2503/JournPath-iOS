@@ -218,7 +218,7 @@ struct ManualExpenseContentView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    if vm.save() { dismiss() }
+                    if vm.save() != nil { dismiss() }
                 } label: {
                     Image(systemName: "checkmark")
                 }
