@@ -94,7 +94,6 @@ let categoryGroups: [POICategoryGroup] = [
             .init("Restaurants", "fork.knife", [.restaurant], color: .orange),
             .init("Parks", "tree.fill", [.nationalPark, .park], color: .green),
             .init("Landmarks", "camera.fill", [.landmark], color: .purple),
-            .init("Lodging", "bed.double.fill", [.hotel], color: .mint, type: .lodging),
         ]
     ),
     POICategoryGroup(

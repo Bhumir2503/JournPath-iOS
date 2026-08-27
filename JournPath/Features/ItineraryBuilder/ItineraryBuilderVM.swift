@@ -5,8 +5,6 @@ import SwiftUI
 
 enum FormDestination: Hashable {
     case activity(MKMapItem)
-    case lodging
-
 }
 
 enum LocationIndicatorStatus: Equatable {
@@ -141,11 +139,7 @@ final class ItineraryBuilderVM: NSObject, CLLocationManagerDelegate {
     /// Resolves the place's timezone, then navigates. Resolution happens
     /// before the form appears so its date pickers are pinned correctly.
     func routeResolvedItem(_ resolved: MKMapItem) {
-        if let type = searchTokens.first?.type, type == .lodging {
-            navigationPath.append(.lodging)
-        } else {
-            navigationPath.append(.activity(resolved))
-        }
+        navigationPath.append(.activity(resolved))
     }
 
     // MARK: - Search

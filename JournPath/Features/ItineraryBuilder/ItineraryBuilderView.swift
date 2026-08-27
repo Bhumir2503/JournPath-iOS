@@ -46,8 +46,6 @@ struct ItineraryBuilderView: View {
                     ActivityFormView(trip: trip.trip!, place: place) {
                         dismiss()
                     }
-                case .lodging:
-                    EmptyView()
                 }
             }
             .searchable(
