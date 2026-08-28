@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Dummy Data
 
-private struct DummyParticipant: Identifiable {
+struct DummyParticipant: Identifiable {
     let id: String
     let name: String
     let color: Color
@@ -29,7 +29,7 @@ private struct DummyTransfer: Identifiable {
     let color: Color
 }
 
-private let participants: [DummyParticipant] = [
+let participants: [DummyParticipant] = [
     .init(id: "You", name: "You", color: .blue),
     .init(id: "Alex", name: "Alex", color: .green),
     .init(id: "Jack", name: "Priya", color: .orange),
@@ -111,7 +111,7 @@ struct ExpenseDummyView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                AddExpenseSheet()
+                ManualExpenseView()
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
@@ -217,207 +217,9 @@ private struct StatCell: View {
     }
 }
 
-// MARK: - Add expense sheet
-
-private struct AddExpenseSheet: View {
-
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var amountText = ""
-    @State private var title = ""
-    @State private var paidBy = participants[0].id
-    @State private var category = "Food"
-    @State private var splitType = "Equal"
-    @State private var included: Set<String> = Set(participants.map(\.id))
-    @State private var exactAmounts: [String: String] = [:]
-    @State private var percentAmounts: [String: String] = [:]
-    @State private var date = Date()
-
-    private let splitTypes = ["Equal", "Exact", "%"]
-    private let categoryOptions = ["Food", "Transport", "Stay", "Activity", "Shopping", "Other"]
-    private var canSave: Bool { !amountText.isEmpty && !title.isEmpty }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    amountHero.padding(.vertical, 16)
-                }
-                .listRowBackground(Color.clear)
-
-                Section {
-                    HStack(spacing: 14) {
-                        Image(systemName: "text.bubble")
-                            .font(.system(size: 17))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28)
-                        TextField("Description", text: $title)
-                    }
-
-                    Picker(selection: $paidBy) {
-                        ForEach(participants) { p in
-                            Text(p.name).tag(p.id)
-                        }
-                    } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: "person")
-                                .font(.system(size: 17))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 28)
-                            Text("Paid by")
-                        }
-                    }
-
-                    Picker(selection: $category) {
-                        ForEach(categoryOptions, id: \.self) { c in
-                            Text(c).tag(c)
-                        }
-                    } label: {
-                        HStack(spacing: 14) {
-                            categoryIcon(for: category).frame(width: 28)
-                            Text("Category")
-                        }
-                    }
-
-                    DatePicker(selection: $date, displayedComponents: .date) {
-                        HStack(spacing: 14) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 17))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 28)
-                            Text("Date")
-                        }
-                    }
-                }
-
-                Section(header: Text("Split")) {
-                    Picker("Split Type", selection: $splitType) {
-                        ForEach(splitTypes, id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.vertical, 4)
-
-                    ForEach(participants) { p in
-                        HStack(spacing: 14) {
-                            Bubble(initial: p.initial, color: p.color, size: 32)
-                            Text(p.name).font(.system(size: 17))
-                            Spacer()
-                            splitControl(for: p)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("New expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { dismiss() }
-                        .fontWeight(.semibold)
-                        .disabled(!canSave)
-                }
-            }
-        }
-    }
-
-    // MARK: Amount hero
-
-    private var amountHero: some View {
-        VStack(spacing: 6) {
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text("¥")
-                    .font(.system(size: 36, weight: .light))
-                    .foregroundStyle(.secondary)
-                TextField("0", text: $amountText)
-                    .font(.system(size: 64, weight: .semibold, design: .rounded))
-                    .foregroundStyle(amountText.isEmpty ? .secondary : .primary)
-                    .keyboardType(.numberPad)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-            Button {
-            } label: {
-                HStack(spacing: 4) {
-                    Text("JPY")
-                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 11))
-                }
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: Split control
-
-    @ViewBuilder
-    private func splitControl(for p: DummyParticipant) -> some View {
-        switch splitType {
-        case "Equal":
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { included.contains(p.id) },
-                    set: { on in
-                        if on { included.insert(p.id) } else if included.count > 1 { included.remove(p.id) }
-                    }
-                )
-            )
-            .labelsHidden()
-
-        case "Exact":
-            TextField(
-                "¥0",
-                text: Binding(
-                    get: { exactAmounts[p.id] ?? "" },
-                    set: { exactAmounts[p.id] = $0 }
-                )
-            )
-            .multilineTextAlignment(.trailing)
-            .frame(width: 80)
-            .keyboardType(.numberPad)
-
-        default:
-            HStack(spacing: 2) {
-                TextField(
-                    "0",
-                    text: Binding(
-                        get: { percentAmounts[p.id] ?? "" },
-                        set: { percentAmounts[p.id] = $0 }
-                    )
-                )
-                .multilineTextAlignment(.trailing)
-                .frame(width: 44)
-                .keyboardType(.numberPad)
-                Text("%").foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    // MARK: Category icon
-
-    private func categoryIcon(for name: String) -> some View {
-        let map: [String: (String, Color)] = [
-            "Food": ("fork.knife", .orange),
-            "Transport": ("tram.fill", .blue),
-            "Stay": ("bed.double.fill", .green),
-            "Activity": ("ticket.fill", .pink),
-            "Shopping": ("bag.fill", .purple),
-            "Other": ("ellipsis.circle", .gray),
-        ]
-        let match = map[name] ?? ("ellipsis.circle", .gray)
-        return Image(systemName: match.0)
-            .font(.system(size: 17))
-            .foregroundStyle(match.1)
-    }
-}
-
 // MARK: - Shared subviews
 
-private struct Bubble: View {
+struct Bubble: View {
     let initial: String
     let color: Color
     let size: CGFloat
@@ -469,4 +271,5 @@ private struct ExpenseRow: View {
 
 #Preview {
     ExpenseDummyView()
+        .environment(ParticipantStore(tripId: "dummy"))
 }

@@ -6,7 +6,7 @@ enum AppRoute: Hashable {
     case settings
     case notifications
     case tripDashboard(tripId: String)
-    case tripMap
+    case tripMap(tripId: String)
 }
 
 // MARK: - App Router
@@ -28,8 +28,8 @@ final class AppRouter {
         path.append(AppRoute.tripDashboard(tripId: tripId))
     }
 
-    func navigateToTripMap() {
-        path.append(AppRoute.tripMap)
+    func navigateToTripMap(tripId: String) {
+        path.append(AppRoute.tripMap(tripId: tripId))
     }
 
     func push(_ route: AppRoute) {

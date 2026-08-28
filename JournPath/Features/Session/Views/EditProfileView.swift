@@ -160,11 +160,6 @@ struct EditProfileView: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 8)
                     }
-
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
-                        Text("Change Photo")
-                            .font(.footnote)
-                    }
                     .padding(.top, 8)
                     .onChange(of: selectedPhotoItem) { _, newItem in
                         Task {

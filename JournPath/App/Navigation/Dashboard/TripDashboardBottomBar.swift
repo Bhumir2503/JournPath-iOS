@@ -3,6 +3,7 @@ import SwiftUI
 struct TripDashboardBottomBar: View {
 
     @Environment(ParticipantStore.self) private var participants
+    @Environment(AppRouter.self) private var router
     @Binding var activeSheet: DashboardSheet?
 
     var body: some View {

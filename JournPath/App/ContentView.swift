@@ -98,8 +98,8 @@ extension ContentView {
             EmptyView()
         case .settings:
             SettingsView()
-        case .tripMap:
-            TripMapView()
+        case .tripMap(let tripId):
+            TripMapView(tripId: tripId)
         case .tripDashboard(let tripId):
             TripDashboardView(tripId: tripId)
         }

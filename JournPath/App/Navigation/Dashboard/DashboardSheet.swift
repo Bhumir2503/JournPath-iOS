@@ -17,9 +17,9 @@ struct DashboardSheetView: View {
         switch sheet {
         case .participant: ParticipantsView()
         case .storage: StorageView(uid: sessionStore.uid)
-        case .expenses: ExpenseDummyView()
+        case .expenses: ExpenseHubView()
         case .checklist: ChecklistSheet()
-        case .itineraryBuilder: EmptyView()
+        case .itineraryBuilder: ItineraryBuilderView()
         case .datePicker:
             DatePickerView(
                 initialStartDate: tripStore.trip?.startDate.deviceLocalFromUTCMidnight,
